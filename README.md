@@ -29,16 +29,27 @@
 
 ### 사전 요구사항
 
-- **macOS**: Catalina 이상 (Intel/Apple Silicon)
+#### macOS
+- **OS**: Catalina 이상 (Intel/Apple Silicon)
 - **Python 3.x**: 개발 서버용
 - **Git**: 소스 코드 관리
+- **Xcode Command Line Tools**: `xcode-select --install`
 - **모던 웹 브라우저**: Chrome, Firefox, Safari (WebAssembly 지원)
+
+#### Windows
+- **OS**: Windows 10 이상
+- **Python 3.x**: [python.org](https://www.python.org/downloads/)에서 설치
+- **Git**: [git-scm.com](https://git-scm.com/download/win)에서 설치
+- **Git Bash** (권장): Git 설치 시 함께 설치됨
+- **모던 웹 브라우저**: Chrome, Firefox, Edge (WebAssembly 지원)
 
 ---
 
 ### ⚡ Quick Start (간단 테스트)
 
-**처음 실행해보는 경우 (3분 소요)**:
+**처음 실행해보는 경우 (3분 소요)**
+
+#### macOS / Linux
 
 ```bash
 # 1. Emscripten 환경 활성화 (emsdk가 이미 설치되어 있어야 함)
@@ -54,13 +65,60 @@ python3 -m http.server 8080
 # http://localhost:8080/hello.html
 ```
 
-**예상 결과**: 브라우저 콘솔에 "Hello and welcome to C++!" 출력
+> ⚠️ **emsdk가 없다면**:
+> ```bash
+> git clone https://github.com/emscripten-core/emsdk.git
+> cd emsdk
+> ./emsdk install latest
+> ./emsdk activate latest
+> source ./emsdk_env.sh
+> cd ..
+> ```
 
-> ⚠️ **emsdk가 없다면**: `git clone https://github.com/emscripten-core/emsdk.git` 후 `cd emsdk && ./emsdk install latest && ./emsdk activate latest`
+#### Windows (PowerShell)
+
+```powershell
+# 1. Emscripten 환경 활성화 (emsdk가 이미 설치되어 있어야 함)
+cd emsdk
+.\emsdk_env.ps1
+cd ..
+
+# 2. Hello World 컴파일
+emcc main.cpp -o hello.html
+
+# 3. 웹 서버 실행 (별도 PowerShell 창에서 실행)
+python -m http.server 8080
+
+# 4. 브라우저에서 열기
+# http://localhost:8080/hello.html
+```
+
+> ⚠️ **emsdk가 없다면**:
+> ```powershell
+> git clone https://github.com/emscripten-core/emsdk.git
+> cd emsdk
+> .\emsdk install latest
+> .\emsdk activate latest
+> .\emsdk_env.ps1
+> cd ..
+> ```
+
+#### Windows (Git Bash - 권장)
+
+```bash
+# macOS/Linux와 동일한 명령어 사용 가능
+cd emsdk && source ./emsdk_env.sh && cd ..
+emcc main.cpp -o hello.html
+python -m http.server 8080
+```
+
+**예상 결과**: 브라우저 콘솔에 "Hello and welcome to C++!" 출력
 
 ---
 
 ### 🎥 웹캠 필터 실행 (전체 프로젝트)
+
+#### macOS / Linux
 
 ```bash
 # 1. Emscripten 환경 활성화
@@ -76,12 +134,46 @@ cd emsdk && source ./emsdk_env.sh && cd ..
 # http://localhost:8080
 ```
 
-### 간편 실행 (자동화 스크립트)
+**간편 실행 (자동화 스크립트)**:
+```bash
+./dev.sh  # 빌드 + 서버 실행 한 번에
+```
+
+#### Windows (Git Bash - 권장)
 
 ```bash
-# 빌드 + 서버 실행 한 번에
-./dev.sh
+# macOS/Linux와 동일
+cd emsdk && source ./emsdk_env.sh && cd ..
+./build.sh
+./serve.sh
 ```
+
+#### Windows (PowerShell)
+
+```powershell
+# 1. Emscripten 환경 활성화
+cd emsdk
+.\emsdk_env.ps1
+cd ..
+
+# 2. 수동 빌드 (build.sh 대신)
+emcc src/filters/grayscale.cpp -o build/filters.js -O3 --bind `
+  -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 `
+  -s EXPORT_NAME="Module" -s EXPORTED_RUNTIME_METHODS='["cwrap","ccall"]'
+
+# 3. 웹 파일 복사
+New-Item -ItemType Directory -Force -Path build
+Copy-Item web/* build/
+
+# 4. 개발 서버 실행
+cd build
+python -m http.server 8080
+
+# 5. 브라우저에서 접속
+# http://localhost:8080
+```
+
+> 💡 **Tip**: Windows에서는 **Git Bash**를 사용하는 것을 강력히 권장합니다. PowerShell보다 훨씬 간편합니다!
 
 ---
 
