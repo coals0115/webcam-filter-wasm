@@ -59,18 +59,7 @@ brew --version
 
 **예상 소요 시간**: 5~10분
 
-#### 2. CMake 설치
-
-```bash
-# CMake 설치
-brew install cmake
-
-# 설치 확인
-cmake --version
-# 출력 예: cmake version 3.27.0
-```
-
-#### 3. Emscripten 설치
+#### 2. Emscripten 설치
 
 ```bash
 # Emscripten SDK 다운로드
@@ -98,7 +87,7 @@ echo 'source "/경로/to/emsdk/emsdk_env.sh"' >> ~/.zshrc
 # echo 'source "$HOME/emsdk/emsdk_env.sh"' >> ~/.zshrc
 ```
 
-#### 4. 설치 확인
+#### 3. 설치 확인
 
 ```bash
 # Emscripten 컴파일러 확인
@@ -107,10 +96,6 @@ emcc --version
 
 em++ --version
 # 출력 예: em++ (Emscripten gcc/clang-like replacement) 3.1.46
-
-# CMake 확인
-cmake --version
-# 출력 예: cmake version 3.27.0
 ```
 
 ---
@@ -129,19 +114,7 @@ git --version
 # 출력 예: git version 2.42.0.windows.1
 ```
 
-#### 2. CMake 설치
-
-1. [CMake 다운로드 페이지](https://cmake.org/download/) 접속
-2. Windows x64 Installer 다운로드
-3. 설치 중 "Add CMake to system PATH" 체크 ✅
-
-**설치 확인**:
-```powershell
-cmake --version
-# 출력 예: cmake version 3.27.0
-```
-
-#### 3. Python 설치 (Emscripten 요구사항)
+#### 2. Python 설치 (Emscripten 요구사항)
 
 1. [Python 다운로드](https://www.python.org/downloads/) (3.8 이상)
 2. 설치 중 "Add Python to PATH" 체크 ✅
@@ -152,7 +125,7 @@ python --version
 # 출력 예: Python 3.11.5
 ```
 
-#### 4. Emscripten 설치
+#### 3. Emscripten 설치
 
 **PowerShell 또는 Git Bash에서 실행**:
 
@@ -178,12 +151,11 @@ cd emsdk
 4. `새로 만들기` → `C:\경로\to\emsdk` 추가
 5. `C:\경로\to\emsdk\upstream\emscripten` 추가
 
-#### 5. 설치 확인
+#### 4. 설치 확인
 
 ```powershell
 emcc --version
 em++ --version
-cmake --version
 python --version
 ```
 
@@ -199,9 +171,6 @@ sudo apt update
 
 # Git 설치
 sudo apt install git
-
-# CMake 설치
-sudo apt install cmake
 
 # Python 설치 (대부분 기본 설치됨)
 sudo apt install python3 python3-pip
@@ -241,7 +210,6 @@ source ~/.bashrc
 ```bash
 emcc --version
 em++ --version
-cmake --version
 python3 --version
 ```
 

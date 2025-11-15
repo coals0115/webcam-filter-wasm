@@ -72,33 +72,6 @@ emcc --version
 
 ---
 
-### ❌ `cmake: command not found`
-
-**증상**:
-```bash
-$ cmake --version
-bash: cmake: command not found
-```
-
-**해결 방법**:
-
-#### macOS:
-```bash
-brew install cmake
-```
-
-#### Windows:
-1. [CMake 다운로드](https://cmake.org/download/)
-2. 설치 시 "Add CMake to PATH" 체크
-3. 터미널 재시작
-
-#### Linux:
-```bash
-sudo apt install cmake
-```
-
----
-
 ### ❌ Python 버전 오류
 
 **증상**:

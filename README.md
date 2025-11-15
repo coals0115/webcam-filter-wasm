@@ -253,7 +253,6 @@ webcam-filter-wasm/
 │   ├── SETUP.md                # 환경 설정 가이드
 │   └── DEVELOPMENT.md          # 개발 워크플로우
 ├── main.cpp                    # 테스트용 메인 파일 (Hello World)
-├── CMakeLists.txt              # CMake 빌드 설정
 ├── build.sh                    # 빌드 스크립트 (Bash)
 ├── build.ps1                   # 빌드 스크립트 (PowerShell)
 ├── serve.sh                    # 개발 서버 스크립트 (Bash)
@@ -397,7 +396,6 @@ webcam-filter-wasm/
 - **Bash Scripts**: 빌드 자동화 (macOS/Linux/Git Bash)
 - **PowerShell Scripts**: 빌드 자동화 (Windows)
 - **Python HTTP Server**: 로컬 개발 서버
-- **CMake**: C++ 프로젝트 빌드 설정
 
 ---
 
