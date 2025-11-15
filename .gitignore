@@ -1,0 +1,19 @@
+# IDE
+.idea/
+
+# Emscripten SDK (should be installed locally)
+emsdk/
+
+# Build artifacts
+build/
+cmake-build-*/
+
+# Compiled files
+*.o
+*.wasm
+*.js
+*.html
+!index.html
+
+# OS files
+.DS_Store
