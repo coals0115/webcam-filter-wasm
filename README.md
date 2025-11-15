@@ -150,13 +150,38 @@ cd emsdk && source ./emsdk_env.sh && cd ..
 
 #### Windows (PowerShell)
 
+**방법 1: PowerShell 스크립트 사용 (간편)**
+
 ```powershell
 # 1. Emscripten 환경 활성화
 cd emsdk
 .\emsdk_env.ps1
 cd ..
 
-# 2. 수동 빌드 (build.sh 대신)
+# 2. 프로젝트 빌드
+.\build.ps1
+
+# 3. 개발 서버 실행
+.\serve.ps1
+
+# 4. 브라우저에서 접속
+# http://localhost:8080
+```
+
+**간편 실행 (자동화 스크립트)**:
+```powershell
+.\dev.ps1  # 빌드 + 서버 실행 한 번에
+```
+
+**방법 2: 수동 빌드 (스크립트 없이)**
+
+```powershell
+# 1. Emscripten 환경 활성화
+cd emsdk
+.\emsdk_env.ps1
+cd ..
+
+# 2. 수동 빌드
 emcc src/filters/grayscale.cpp -o build/filters.js -O3 --bind `
   -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 `
   -s EXPORT_NAME="Module" -s EXPORTED_RUNTIME_METHODS='["cwrap","ccall"]'
@@ -172,6 +197,12 @@ python -m http.server 8080
 # 5. 브라우저에서 접속
 # http://localhost:8080
 ```
+
+> ⚠️ **PowerShell 실행 정책 에러가 나는 경우**:
+> ```powershell
+> Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+> 실행 후 `Y` 입력
 
 > 💡 **Tip**: Windows에서는 **Git Bash**를 사용하는 것을 강력히 권장합니다. PowerShell보다 훨씬 간편합니다!
 
@@ -196,9 +227,12 @@ webcam-filter-wasm/
 ├── docs/                       # 문서
 │   ├── SETUP.md                # 환경 설정 가이드
 │   └── DEVELOPMENT.md          # 개발 워크플로우
-├── build.sh                    # 빌드 스크립트
-├── serve.sh                    # 개발 서버 스크립트
-├── dev.sh                      # 통합 개발 스크립트
+├── build.sh                    # 빌드 스크립트 (Bash)
+├── build.ps1                   # 빌드 스크립트 (PowerShell)
+├── serve.sh                    # 개발 서버 스크립트 (Bash)
+├── serve.ps1                   # 개발 서버 스크립트 (PowerShell)
+├── dev.sh                      # 통합 개발 스크립트 (Bash)
+├── dev.ps1                     # 통합 개발 스크립트 (PowerShell)
 └── README.md                   # 이 파일
 ```
 
