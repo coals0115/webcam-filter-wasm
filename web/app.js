@@ -11,6 +11,7 @@ const statusDiv = document.getElementById('status');
 // 버튼
 const btnNone = document.getElementById('btnNone');
 const btnGrayscale = document.getElementById('btnGrayscale');
+const btnFlip = document.getElementById('btnFlip');
 
 // 성능 측정
 const processingTimeEl = document.getElementById('processingTime');
@@ -31,21 +32,14 @@ async function loadWasmModule() {
     try {
         statusDiv.innerHTML = '<p>WebAssembly 모듈 로딩 중...</p>';
 
-        // Emscripten이 생성한 Module 사용
-        if (typeof Module === 'undefined') {
+        // Emscripten MODULARIZE 모드: Module은 async 함수
+        if (typeof Module !== 'function') {
             throw new Error('WebAssembly 모듈을 찾을 수 없습니다. filters.js가 로드되었는지 확인하세요.');
         }
 
-        // Module이 준비될 때까지 대기
-        await new Promise((resolve) => {
-            if (Module.calledRun) {
-                resolve();
-            } else {
-                Module.onRuntimeInitialized = resolve;
-            }
-        });
+        // Module 초기화 (MODULARIZE 모드에서는 함수 호출 필요)
+        wasmModule = await Module();
 
-        wasmModule = Module;
         statusDiv.innerHTML = '<p class="success">✅ WebAssembly 모듈 로딩 완료</p>';
         statusDiv.classList.add('success');
 
@@ -116,6 +110,8 @@ function processFrame() {
         try {
             if (currentFilter === 'grayscale') {
                 wasmModule.applyGrayscale(imageData);
+            } else if (currentFilter === 'flip') {
+                wasmModule.applyHorizontalFlip(imageData);
             }
 
             ctx.putImageData(imageData, 0, 0);
@@ -158,6 +154,8 @@ function setFilter(filter) {
         btnNone.classList.add('active');
     } else if (filter === 'grayscale') {
         btnGrayscale.classList.add('active');
+    } else if (filter === 'flip') {
+        btnFlip.classList.add('active');
     }
 }
 
@@ -167,6 +165,7 @@ function setFilter(filter) {
 function setupEventListeners() {
     btnNone.addEventListener('click', () => setFilter('none'));
     btnGrayscale.addEventListener('click', () => setFilter('grayscale'));
+    btnFlip.addEventListener('click', () => setFilter('flip'));
 }
 
 /**
