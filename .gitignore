@@ -11,9 +11,15 @@ cmake-build-*/
 # Compiled files
 *.o
 *.wasm
-*.js
-*.html
-!index.html
+build/*.js
+build/*.html
+filters.js
+filters.wasm
+
+# Keep source files
+!web/**/*.js
+!web/**/*.html
+!web/**/*.css
 
 # OS files
 .DS_Store

@@ -34,32 +34,46 @@
 - **Git**: 소스 코드 관리
 - **모던 웹 브라우저**: Chrome, Firefox, Safari (WebAssembly 지원)
 
-### 설치 및 실행
+---
+
+### ⚡ Quick Start (간단 테스트)
+
+**처음 실행해보는 경우 (3분 소요)**:
 
 ```bash
-# 1. 저장소 클론 (또는 이미 있다면 스킵)
-git clone <repository-url>
-cd webcam-filter-wasm
+# 1. Emscripten 환경 활성화 (emsdk가 이미 설치되어 있어야 함)
+cd emsdk && source ./emsdk_env.sh && cd ..
 
-# 2. Emscripten SDK 설치 (처음 한 번만)
-git clone https://github.com/emscripten-core/emsdk.git
-cd emsdk
-./emsdk install latest
-./emsdk activate latest
-source ./emsdk_env.sh
-cd ..
+# 2. Hello World 컴파일
+emcc main.cpp -o hello.html
 
-# 3. 프로젝트 빌드
+# 3. 웹 서버 실행 (별도 터미널 창에서 실행)
+python3 -m http.server 8080
+
+# 4. 브라우저에서 열기
+# http://localhost:8080/hello.html
+```
+
+**예상 결과**: 브라우저 콘솔에 "Hello and welcome to C++!" 출력
+
+> ⚠️ **emsdk가 없다면**: `git clone https://github.com/emscripten-core/emsdk.git` 후 `cd emsdk && ./emsdk install latest && ./emsdk activate latest`
+
+---
+
+### 🎥 웹캠 필터 실행 (전체 프로젝트)
+
+```bash
+# 1. Emscripten 환경 활성화
+cd emsdk && source ./emsdk_env.sh && cd ..
+
+# 2. 프로젝트 빌드
 ./build.sh
 
-# 4. 웹 파일 복사
-cp web/* build/
-
-# 5. 개발 서버 실행
+# 3. 개발 서버 실행
 ./serve.sh
 
-# 6. 브라우저에서 접속
-# http://localhost:8080/index.html
+# 4. 브라우저에서 접속
+# http://localhost:8080
 ```
 
 ### 간편 실행 (자동화 스크립트)
