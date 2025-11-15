@@ -124,12 +124,37 @@ function processFrame() {
     const processingTime = performance.now() - startTime;
     processingTimeEl.textContent = `${processingTime.toFixed(2)} ms`;
 
+    // Performance-based color coding for processing time
+    processingTimeEl.className = 'stat-value';
+    if (processingTime < 10) {
+        processingTimeEl.classList.add('perf-excellent');
+    } else if (processingTime < 20) {
+        processingTimeEl.classList.add('perf-good');
+    } else if (processingTime < 33) {
+        processingTimeEl.classList.add('perf-warning');
+    } else {
+        processingTimeEl.classList.add('perf-critical');
+    }
+
     // FPS 계산 (1초마다 업데이트)
     frameCount++;
     const now = Date.now();
     if (now - fpsUpdateTime >= 1000) {
         const fps = frameCount / ((now - fpsUpdateTime) / 1000);
         fpsEl.textContent = `${fps.toFixed(1)}`;
+
+        // Performance-based color coding for FPS
+        fpsEl.className = 'stat-value';
+        if (fps >= 55) {
+            fpsEl.classList.add('perf-excellent');
+        } else if (fps >= 40) {
+            fpsEl.classList.add('perf-good');
+        } else if (fps >= 25) {
+            fpsEl.classList.add('perf-warning');
+        } else {
+            fpsEl.classList.add('perf-critical');
+        }
+
         frameCount = 0;
         fpsUpdateTime = now;
     }
@@ -144,18 +169,29 @@ function processFrame() {
 function setFilter(filter) {
     currentFilter = filter;
 
-    // 모든 버튼에서 active 클래스 제거
+    // 모든 버튼에서 active 클래스 제거 및 aria-pressed 업데이트
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.classList.remove('active');
+        btn.setAttribute('aria-pressed', 'false');
     });
 
-    // 선택된 버튼에 active 클래스 추가
+    // 선택된 버튼에 active 클래스 추가 및 aria-pressed 업데이트
+    let activeBtn;
     if (filter === 'none') {
-        btnNone.classList.add('active');
+        activeBtn = btnNone;
     } else if (filter === 'grayscale') {
-        btnGrayscale.classList.add('active');
+        activeBtn = btnGrayscale;
     } else if (filter === 'flip') {
-        btnFlip.classList.add('active');
+        activeBtn = btnFlip;
+    }
+
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.setAttribute('aria-pressed', 'true');
+
+        // Glitch effect on filter change
+        canvas.classList.add('glitch-effect');
+        setTimeout(() => canvas.classList.remove('glitch-effect'), 300);
     }
 }
 
@@ -172,6 +208,17 @@ function setupEventListeners() {
  * 앱 초기화
  */
 async function init() {
+    // Startup animation - fade in container
+    const container = document.querySelector('.container');
+    container.style.opacity = '0';
+    container.style.transform = 'translateY(20px)';
+
+    setTimeout(() => {
+        container.style.transition = 'opacity 0.8s ease, transform 0.8s ease';
+        container.style.opacity = '1';
+        container.style.transform = 'translateY(0)';
+    }, 100);
+
     setupEventListeners();
 
     // WebAssembly 모듈 로딩
