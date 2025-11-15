@@ -16,10 +16,25 @@ build/*.html
 filters.js
 filters.wasm
 
+# Test files (Quick Start)
+hello.html
+hello.js
+hello.wasm
+
+# Misplaced build artifacts
+webcam_filter.js
+webcam_filter.wasm
+
 # Keep source files
 !web/**/*.js
 !web/**/*.html
 !web/**/*.css
+
+# Claude Code logs
+logs/
+
+# Playwright cache
+.playwright-mcp/
 
 # OS files
 .DS_Store
