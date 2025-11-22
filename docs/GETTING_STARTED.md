@@ -233,27 +233,21 @@ ls -la
 **예상 출력**:
 ```
 .
-├── CMakeLists.txt
 ├── README.md
 ├── docs/
-├── public/
+├── web/
 │   ├── index.html
-│   └── styles.css
+│   ├── styles.css
+│   ├── app.js
+│   └── wrapper.js
 ├── src/
-│   └── main.cpp
-└── build.sh
+│   └── filters/
+│       └── grayscale.cpp
+├── build.sh
+└── serve.sh
 ```
 
-### 2. 빌드 디렉토리 생성
-
-```bash
-# build 디렉토리 생성
-mkdir -p build
-
-# 권한 확인 (macOS/Linux)
-ls -ld build
-# 출력 예: drwxr-xr-x  2 user  staff  64 Nov 15 10:00 build
-```
+**참고**: `build.sh` 스크립트가 빌드 디렉토리를 자동으로 생성하므로 수동으로 생성할 필요 없습니다.
 
 ---
 
@@ -271,29 +265,40 @@ chmod +x build.sh
 ./build.sh
 ```
 
-#### Windows (PowerShell)
+#### Windows (Git Bash 또는 PowerShell)
 
-```powershell
-# 수동 빌드 명령
-cd build
-emcmake cmake ..
-emmake make
+```bash
+# Git Bash에서 실행 (권장)
+./build.sh
+
+# 또는 PowerShell에서 수동 빌드
+emcc src/filters/grayscale.cpp -o build/filters.js -O3 --bind -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_NAME="Module" -s EXPORTED_RUNTIME_METHODS='["cwrap","ccall"]'
 ```
 
 ### 빌드 과정 이해
 
 ```
-1. CMake 설정
-   - CMakeLists.txt 읽기
-   - 빌드 환경 구성
+1. Emscripten 환경 확인
+   - emcc 명령어 사용 가능 여부 체크
+   - 버전 정보 출력
 
-2. Emscripten 컴파일
-   - src/main.cpp → filter.wasm
-   - JavaScript 래퍼 생성 → filter.js
+2. 빌드 디렉토리 생성
+   - build/ 디렉토리 자동 생성
 
-3. 출력 파일
-   - public/filter.js
-   - public/filter.wasm
+3. C++ → WebAssembly 컴파일
+   - src/filters/grayscale.cpp → build/filters.wasm
+   - JavaScript 래퍼 생성 → build/filters.js
+
+4. 웹 파일 복사
+   - web/ 디렉토리의 HTML, CSS, JS를 build/로 복사
+
+5. 출력 파일
+   - build/filters.js
+   - build/filters.wasm
+   - build/index.html
+   - build/styles.css
+   - build/app.js
+   - build/wrapper.js
 ```
 
 ### 예상 빌드 시간
@@ -305,57 +310,67 @@ emmake make
 
 ```bash
 # 생성된 파일 확인
-ls -lh public/
+ls -lh build/
 
 # 예상 출력:
-# -rw-r--r--  filter.js    (약 50KB)
-# -rw-r--r--  filter.wasm  (약 20KB)
+# -rw-r--r--  filters.js    (약 50KB)
+# -rw-r--r--  filters.wasm  (약 20KB)
 # -rw-r--r--  index.html
 # -rw-r--r--  styles.css
+# -rw-r--r--  app.js
+# -rw-r--r--  wrapper.js
 ```
 
 ---
 
 ## 개발 서버 실행
 
-### 방법 1: Python 내장 서버 (권장)
+### 방법 1: serve.sh 스크립트 사용 (권장)
 
 ```bash
 # 프로젝트 루트에서 실행
-cd public
-python3 -m http.server 8000
-
-# 또는 Python 2
-python -m SimpleHTTPServer 8000
+./serve.sh
 ```
 
 **출력 예시**:
 ```
-Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+======================================
+  WebCam Filter WASM - 개발 서버
+======================================
+
+✅ 서버 실행 중...
+
+브라우저에서 접속:
+  http://localhost:8080
+
+종료: Ctrl+C
+======================================
+
+Serving HTTP on 0.0.0.0 port 8080 (http://0.0.0.0:8080/) ...
 ```
 
-### 방법 2: Node.js http-server
+### 방법 2: Python 내장 서버
 
 ```bash
-# http-server 설치 (최초 1회)
-npm install -g http-server
+# 빌드 디렉토리로 이동하여 실행
+cd build
+python3 -m http.server 8080
 
-# 서버 실행
-cd public
-http-server -p 8000
+# 또는 Python 2
+python -m SimpleHTTPServer 8080
 ```
 
 ### 방법 3: VS Code Live Server
 
 1. VS Code 설치
 2. Live Server 확장 프로그램 설치
-3. `public/index.html` 우클릭
+3. `build/index.html` 우클릭
 4. "Open with Live Server" 선택
 
 ### 브라우저에서 확인
 
 1. 브라우저 열기 (Chrome 권장)
-2. 주소창에 입력: `http://localhost:8000`
+2. 주소창에 입력: `http://localhost:8080`
 3. 웹캠 권한 허용
 4. 필터 버튼 클릭하여 테스트
 
@@ -395,26 +410,7 @@ cat ~/.zshrc                 # macOS
 cat ~/.bashrc                # Linux
 ```
 
-### 2. CMake를 찾을 수 없음
-
-**증상**:
-```bash
-cmake: command not found
-```
-
-**해결**:
-```bash
-# macOS
-brew install cmake
-
-# Windows
-# PATH에 CMake bin 디렉토리 추가
-
-# Linux
-sudo apt install cmake
-```
-
-### 3. 빌드 실패 - 권한 오류
+### 2. 빌드 실패 - 권한 오류
 
 **증상**:
 ```bash
@@ -455,10 +451,10 @@ CompileError: WebAssembly.instantiate(): Wasm code generation disallowed
 **체크리스트**:
 ```bash
 # 1. WASM 파일 생성 확인
-ls -lh public/filter.wasm
+ls -lh build/filters.wasm
 
 # 2. JavaScript 파일 확인
-ls -lh public/filter.js
+ls -lh build/filters.js
 
 # 3. 브라우저 콘솔 확인 (F12)
 # - 에러 메시지 확인
@@ -496,11 +492,10 @@ ls -lh public/filter.js
 - **Visual Studio Code** (권장)
   - C/C++ 확장 프로그램
   - Live Server 확장
-  - CMake Tools 확장
 
 - **CLion** (전문가용)
   - 강력한 C++ 지원
-  - 내장 CMake 통합
+  - WebAssembly 디버깅 지원
 
 #### 브라우저
 - **Google Chrome** (권장)
@@ -510,7 +505,7 @@ ls -lh public/filter.js
 ### 개발 워크플로우
 
 ```
-1. 코드 수정 (main.cpp)
+1. 코드 수정 (src/filters/grayscale.cpp)
    ↓
 2. 빌드 (./build.sh)
    ↓
@@ -528,7 +523,7 @@ ls -lh public/filter.js
 ./build.sh && echo "Build OK"
 
 # 빌드 후 자동 브라우저 열기 (macOS)
-./build.sh && open http://localhost:8000
+./build.sh && open http://localhost:8080
 
 # 파일 변경 감지 자동 빌드 (watch 설치 필요)
 # macOS: brew install watch
@@ -541,8 +536,8 @@ watch -n 2 ./build.sh
 
 ### 공식 문서
 - [Emscripten 튜토리얼](https://emscripten.org/docs/getting_started/Tutorial.html)
-- [CMake 가이드](https://cmake.org/cmake/help/latest/guide/tutorial/index.html)
 - [WebAssembly MDN](https://developer.mozilla.org/en-US/docs/WebAssembly)
+- [C++ 레퍼런스](https://en.cppreference.com/)
 
 ### 커뮤니티
 - [Emscripten GitHub](https://github.com/emscripten-core/emscripten)
@@ -561,11 +556,10 @@ watch -n 2 ./build.sh
 설정 완료 확인:
 
 - [ ] Emscripten 설치 완료 (`emcc --version` 실행됨)
-- [ ] CMake 설치 완료 (`cmake --version` 실행됨)
 - [ ] 프로젝트 클론 완료
-- [ ] 빌드 성공 (filter.js, filter.wasm 생성)
-- [ ] 로컬 서버 실행 가능
-- [ ] 브라우저에서 웹캠 작동 확인
-- [ ] 필터 적용 정상 작동
+- [ ] 빌드 성공 (`./build.sh` 실행 → `build/filters.js`, `build/filters.wasm` 생성)
+- [ ] 로컬 서버 실행 가능 (`./serve.sh` 또는 `python3 -m http.server`)
+- [ ] 브라우저에서 웹캠 작동 확인 (`http://localhost:8080`)
+- [ ] 필터 적용 정상 작동 (흑백 필터, 좌우반전 버튼 동작)
 
 모두 체크했다면 축하합니다! 🎉 이제 개발을 시작할 준비가 되었습니다.

@@ -1,6 +1,10 @@
 # WebCam Filter WASM - 빌드 스크립트 (PowerShell)
 # C++ 소스를 WebAssembly로 컴파일합니다.
 
+# UTF-8 인코딩 설정 (한글 깨짐 방지)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 # 에러 발생 시 스크립트 중단하지만 에러 메시지는 표시
 $ErrorActionPreference = "Stop"
 

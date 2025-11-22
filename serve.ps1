@@ -1,6 +1,10 @@
 # WebCam Filter WASM - 개발 서버 실행 스크립트 (PowerShell)
 # Python 내장 HTTP 서버를 사용하여 로컬 서버를 실행합니다.
 
+# UTF-8 인코딩 설정 (한글 깨짐 방지)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 # 에러 발생 시 스크립트 중단하지만 에러 메시지는 표시
 $ErrorActionPreference = "Stop"
 
