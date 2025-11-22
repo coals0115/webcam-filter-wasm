@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="WebAssembly로 구현한 고성능 실시간 웹캠 필터 - 네이티브급 성능의 이미지 처리">
+    <meta name="theme-color" content="#0a0e1a">
+    <title>WebCam Filter WASM - 실시간 웹캠 필터</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header role="banner">
+            <h1>WebCam Filter</h1>
+            <p>실시간 비디오 필터링 - WebAssembly로 구현한 네이티브급 성능</p>
+        </header>
+
+        <main role="main">
+            <!-- Video Display Section -->
+            <section class="video-container" aria-label="웹캠 비디오 스트림">
+                <video id="webcam" autoplay playsinline aria-hidden="true"></video>
+                <canvas id="canvas" role="img" aria-label="필터 적용된 실시간 웹캠 화면"></canvas>
+            </section>
+
+            <!-- Filter Controls -->
+            <div class="controls">
+                <nav class="filter-buttons" role="navigation" aria-label="필터 선택">
+                    <button id="btnNone" class="filter-btn active" aria-pressed="true" data-filter="none">
+                        원본
+                    </button>
+                    <button id="btnGrayscale" class="filter-btn" aria-pressed="false" data-filter="grayscale">
+                        흑백
+                    </button>
+                    <button id="btnFlip" class="filter-btn" aria-pressed="false" data-filter="flip">
+                        좌우반전
+                    </button>
+                </nav>
+
+                <!-- Performance Stats Dashboard -->
+                <section class="stats" role="region" aria-label="성능 지표">
+                    <div class="stat-item">
+                        <span class="stat-label">처리 시간</span>
+                        <span id="processingTime" class="stat-value" aria-live="polite">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">FPS</span>
+                        <span id="fps" class="stat-value" aria-live="polite">-</span>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Status Messages -->
+            <div id="status" class="status" role="status" aria-live="polite">
+                <p>WebAssembly 모듈 로딩 중...</p>
+            </div>
+        </main>
+
+        <footer role="contentinfo">
+            <p>
+                <span>C++ + WebAssembly</span>
+                <span aria-hidden="true"> | </span>
+                <a href="https://github.com/emscripten-core/emscripten" target="_blank" rel="noopener noreferrer">
+                    Emscripten
+                </a>
+            </p>
+        </footer>
+    </div>
+
+    <script src="filters.js"></script>
+    <script src="wrapper.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
