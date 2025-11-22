@@ -1,0 +1,41 @@
+name: Deploy to Github Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. 코드 체크아웃
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        submodules: true # emsdk 서브모듈 포함
+
+    # 2. Emscripten 설치
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v12
+      with:
+        version: 'latest'
+
+    # 3. 프로젝트 빌드
+    - name: Build WASM
+      run: |
+        chmod +x build.sh
+        ./build.sh
+
+    # 4. Jekyll 비활성화
+    - name: Disable Jekyll
+      run: touch build/.nojekyll
+
+    # 5. Github Pages에 배포
+    - name: Deploy to Github Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./build
+        publish_branch: gh-pages
