@@ -12,6 +12,7 @@ const statusDiv = document.getElementById('status');
 const btnNone = document.getElementById('btnNone');
 const btnGrayscale = document.getElementById('btnGrayscale');
 const btnFlip = document.getElementById('btnFlip');
+const btnSepia = document.getElementById('btnSepia');
 
 // 성능 측정
 const processingTimeEl = document.getElementById('processingTime');
@@ -112,6 +113,8 @@ function processFrame() {
                 wasmModule.applyGrayscale(imageData);
             } else if (currentFilter === 'flip') {
                 wasmModule.applyHorizontalFlip(imageData);
+            } else if (currentFilter === 'sepia') {
+                wasmModule.applySepiaFilter(imageData);
             }
 
             ctx.putImageData(imageData, 0, 0);
@@ -183,6 +186,8 @@ function setFilter(filter) {
         activeBtn = btnGrayscale;
     } else if (filter === 'flip') {
         activeBtn = btnFlip;
+    } else if (filter === 'sepia') {
+      activeBtn = btnSepia;
     }
 
     if (activeBtn) {
@@ -202,6 +207,7 @@ function setupEventListeners() {
     btnNone.addEventListener('click', () => setFilter('none'));
     btnGrayscale.addEventListener('click', () => setFilter('grayscale'));
     btnFlip.addEventListener('click', () => setFilter('flip'));
+    btnSepia.addEventListener('click', () => setFilter('sepia'));
 }
 
 /**
