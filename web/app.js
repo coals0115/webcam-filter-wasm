@@ -127,6 +127,8 @@ function processFrame() {
             wasmModule.applyGrayscale(wasmBuffer, data.length);
         } else if (currentFilter === 'flip') {
             wasmModule.applyHorizontalFlip(wasmBuffer, canvas.width, canvas.height);
+        } else if (currentFilter === 'sepia') {
+            wasmModule.applySepia(wasmBuffer, data.length);
         }
 
         // 3. WASM 메모리에서 JS로 결과 복사 (한 번만)
