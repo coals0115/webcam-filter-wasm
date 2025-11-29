@@ -646,6 +646,46 @@ void applyVHS(uintptr_t dataPtr, int width, int height, int seed) {
 }
 
 /**
+ * 크로마키(Chroma Key) 필터 구현 - 고성능 버전
+ * 특정 색상을 감지하여 배경 이미지로 대체
+ *
+ * @param framePtr 전경(웹캠) 이미지 RGBA 버퍼 포인터
+ * @param bgPtr 배경 이미지 RGBA 버퍼 포인터
+ * @param width 이미지 너비
+ * @param height 이미지 높이
+ * @param keyR 크로마키 기준색 R
+ * @param keyG 크로마키 기준색 G
+ * @param keyB 크로마키 기준색 B
+ * @param tolerance 허용 오차 범위
+ */
+void applyChromaKey(uintptr_t framePtr, uintptr_t bgPtr, int width, int height,
+                    int keyR, int keyG, int keyB, int tolerance) {
+
+    uint8_t* frame = reinterpret_cast<uint8_t*>(framePtr);
+    uint8_t* bg = reinterpret_cast<uint8_t*>(bgPtr);
+
+    int total = width * height;
+    int tolSq = tolerance * tolerance;
+
+    for (int i = 0; i < total; i++) {
+        int idx = i * 4;
+
+        int dr = frame[idx]     - keyR;
+        int dg = frame[idx + 1] - keyG;
+        int db = frame[idx + 2] - keyB;
+
+        int distSq = dr * dr + dg * dg + db * db;
+
+        if (distSq <= tolSq) {
+            frame[idx]     = bg[idx];
+            frame[idx + 1] = bg[idx + 1];
+            frame[idx + 2] = bg[idx + 2];
+            frame[idx + 3] = bg[idx + 3];
+        }
+    }
+}
+
+/**
  * WASM 메모리 할당 함수
  * JavaScript에서 데이터를 복사할 버퍼 생성
  *
@@ -678,6 +718,7 @@ EMSCRIPTEN_BINDINGS(filters) {
     function("applyMirror", &applyMirror);
     function("applyOldTV", &applyOldTV);
     function("applyVHS", &applyVHS);
+    function("applyChromaKey", &applyChromaKey);
     function("allocateBuffer", &allocateBuffer);
     function("freeBuffer", &freeBuffer);
 }
