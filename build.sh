@@ -29,7 +29,7 @@ echo "✅ build/ 디렉토리 준비 완료"
 echo ""
 echo "🔨 C++ → WebAssembly 컴파일 중..."
 emcc \
-    src/filters/grayscale.cpp \
+    src/filters/filters.cpp \
     -o build/filters.js \
     -O3 \
     --bind \
@@ -37,7 +37,8 @@ emcc \
     -s ALLOW_MEMORY_GROWTH=1 \
     -s MODULARIZE=1 \
     -s EXPORT_NAME="Module" \
-    -s EXPORTED_RUNTIME_METHODS='["cwrap","ccall"]'
+    -s EXPORTED_RUNTIME_METHODS='["cwrap","ccall","HEAPU8"]' \
+    -s EXPORTED_FUNCTIONS='["_malloc","_free"]'
 
 echo "✅ 컴파일 완료: build/filters.wasm, build/filters.js"
 
