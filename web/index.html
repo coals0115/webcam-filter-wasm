@@ -61,7 +61,27 @@
                     <button id="btnVHS" class="filter-btn" aria-pressed="false" data-filter="vhs">
                         VHS
                     </button>
+                    <button id="btnChroma" class="filter-btn" aria-pressed="false" data-filter="chroma">
+                        크로마키
+                    </button>
                 </nav>
+
+                <!-- Chroma Key Controls -->
+                <section class="chroma-controls" aria-label="크로마키 설정">
+                    <div class="chroma-row">
+                        <label for="chromaColor">배경 색상</label>
+                        <input type="color" id="chromaColor" value="#00ff00">
+                    </div>
+                    <div class="chroma-row">
+                        <label for="chromaTolerance">허용 범위</label>
+                        <input type="range" id="chromaTolerance" min="10" max="150" value="60">
+                        <span id="chromaToleranceValue">60</span>
+                    </div>
+                    <div class="chroma-row">
+                        <label for="chromaFile">배경 이미지</label>
+                        <input type="file" id="chromaFile" accept="image/*">
+                    </div>
+                </section>
 
                 <!-- Performance Stats Dashboard -->
                 <section class="stats" role="region" aria-label="성능 지표">

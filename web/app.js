@@ -22,34 +22,19 @@ const btnToon = document.getElementById('btnToon');
 const btnMirror = document.getElementById('btnMirror');
 const btnOldTV = document.getElementById('btnOldTV');
 const btnVHS = document.getElementById('btnVHS');
+const btnChroma = document.getElementById('btnChroma');
 
-// 크로마키 버튼 동적 생성
-const btnChroma = document.createElement('button');
-btnChroma.id = 'btnChroma';
-btnChroma.className = 'filter-btn';
-btnChroma.textContent = '크로마키';
-btnChroma.setAttribute('aria-pressed', 'false');
-document.querySelector('.filter-buttons').appendChild(btnChroma);
+// 크로마키 UI 요소
+const chromaControls = document.querySelector('.chroma-controls');
+const chromaColorInput = document.getElementById('chromaColor');
+const chromaToleranceInput = document.getElementById('chromaTolerance');
+const chromaToleranceValue = document.getElementById('chromaToleranceValue');
+const chromaFileInput = document.getElementById('chromaFile');
 
-// 크로마키 UI 요소 생성
-const chromaControls = document.createElement('section');
-chromaControls.className = 'chroma-controls';
-chromaControls.innerHTML = `
-    <div class="chroma-row">
-        <label for="chromaColor">배경 색상</label>
-        <input type="color" id="chromaColor" value="#00ff00">
-    </div>
-    <div class="chroma-row">
-        <label for="chromaTolerance">허용 범위</label>
-        <input type="range" id="chromaTolerance" min="10" max="150" value="60">
-        <span id="chromaToleranceValue">60</span>
-    </div>
-    <div class="chroma-row">
-        <label for="chromaFile">배경 이미지</label>
-        <input type="file" id="chromaFile" accept="image/*">
-    </div>
-`;
-document.querySelector('.controls').appendChild(chromaControls);
+// 크로마키 옵션 초기 상태는 비활성화 (버튼 선택 시에만 표시)
+if (chromaControls) {
+    chromaControls.style.display = 'none';
+}
 
 // 성능 측정
 const processingTimeEl = document.getElementById('processingTime');
@@ -295,8 +280,10 @@ function setFilter(filter) {
         activeBtn.setAttribute('aria-pressed', 'true');
     }
 
-    // 크로마키 UI 표시/숨김
-    chromaControls.style.display = (filter === 'chroma') ? 'block' : 'none';
+    // 크로마키 필터 선택 여부에 따라 옵션 표시/숨김 처리
+    if (chromaControls) {
+        chromaControls.style.display = (filter === 'chroma') ? 'flex' : 'none';
+    }
 }
 
 /**
