@@ -63,14 +63,12 @@
 #### Day 3-4: 개발 환경 설정
 - [ ] 📖 [GETTING_STARTED.md](GETTING_STARTED.md) 따라하기
   - Emscripten 설치
-  - CMake 설치
   - 프로젝트 클론
 
 **실습**:
 ```bash
 # 설치 확인 명령어 실행
 emcc --version
-cmake --version
 
 # 첫 번째 빌드
 ./build.sh

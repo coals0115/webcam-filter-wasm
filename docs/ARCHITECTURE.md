@@ -19,7 +19,10 @@
 ```
 webcam-filter-wasm/
 │
-├── 📁 src/                    # C++ 소스 코드 (현재 사용 안 함)
+├── 📁 src/                    # C++ 소스 코드
+│   └── filters/              # 필터 구현
+│       └── grayscale.cpp     # 흑백 + 좌우반전 필터
+│
 ├── 📁 web/                    # 웹 프론트엔드
 │   ├── index.html            # 메인 HTML 페이지
 │   ├── styles.css            # 스타일시트
@@ -27,8 +30,9 @@ webcam-filter-wasm/
 │   └── wrapper.js            # WASM 로딩 래퍼
 │
 ├── 📁 build/                  # 빌드 출력물
-│   ├── filter.js             # 생성된 JavaScript 래퍼
-│   └── filter.wasm           # 컴파일된 WebAssembly
+│   ├── filters.js            # 생성된 JavaScript 글루 코드
+│   ├── filters.wasm          # 컴파일된 WebAssembly
+│   └── (web 파일들 복사됨)    # index.html, app.js 등
 │
 ├── 📁 docs/                   # 문서
 │   ├── CONCEPTS.md           # 기초 개념
@@ -36,9 +40,8 @@ webcam-filter-wasm/
 │   ├── ARCHITECTURE.md       # 이 문서
 │   └── ...
 │
-├── main.cpp                  # C++ 메인 소스 파일
-├── CMakeLists.txt            # CMake 빌드 설정
-├── build.sh                  # 빌드 스크립트
+├── main.cpp                  # 테스트용 Hello World
+├── build.sh                  # 빌드 스크립트 (emcc 사용)
 ├── serve.sh                  # 개발 서버 스크립트
 └── README.md                 # 프로젝트 설명
 ```
@@ -111,37 +114,9 @@ EMSCRIPTEN_BINDINGS(webcam_filter) {
 
 ---
 
-### 2. CMakeLists.txt (빌드 설정)
+### 2. build.sh (빌드 스크립트)
 
-**역할**: CMake 빌드 시스템 설정
-
-**위치**: `/CMakeLists.txt`
-
-**주요 내용**:
-```cmake
-cmake_minimum_required(VERSION 3.10)
-project(webcam_filter)
-
-# C++17 표준 사용
-set(CMAKE_CXX_STANDARD 17)
-
-# Emscripten 바인딩 활성화
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --bind")
-
-# 실행 파일 생성
-add_executable(filter main.cpp)
-```
-
-**핵심 역할**:
-- C++ 컴파일 옵션 설정
-- Emscripten 컴파일러 설정
-- 출력 파일 이름 지정
-
----
-
-### 3. build.sh (빌드 스크립트)
-
-**역할**: 컴파일 자동화
+**역할**: emcc를 사용한 컴파일 자동화
 
 **위치**: `/build.sh`
 
@@ -149,18 +124,24 @@ add_executable(filter main.cpp)
 ```bash
 #!/bin/bash
 
+# Emscripten 환경 활성화
+cd emsdk && source ./emsdk_env.sh && cd ..
+
 # build 디렉토리 생성
 mkdir -p build
-cd build
 
-# CMake 설정 (Emscripten 사용)
-emcmake cmake ..
+# C++ → WebAssembly 컴파일
+emcc src/filters/grayscale.cpp -o build/filters.js \
+  -O3 \
+  --bind \
+  -s WASM=1 \
+  -s ALLOW_MEMORY_GROWTH=1 \
+  -s MODULARIZE=1 \
+  -s EXPORT_NAME="Module" \
+  -s EXPORTED_RUNTIME_METHODS='["cwrap","ccall"]'
 
-# 빌드 실행
-emmake make
-
-# 생성된 파일 복사
-cp filter.js filter.wasm ../web/
+# 웹 파일 복사
+cp web/* build/
 ```
 
 **실행 방법**:
@@ -169,14 +150,22 @@ chmod +x build.sh
 ./build.sh
 ```
 
+**주요 컴파일 옵션**:
+- `-O3`: 최적화 레벨 3 (최고 성능)
+- `--bind`: Emscripten embind 활성화 (C++ ↔ JS 바인딩)
+- `-s WASM=1`: WebAssembly 출력 활성화
+- `-s ALLOW_MEMORY_GROWTH=1`: 동적 메모리 증가 허용
+- `-s MODULARIZE=1`: ES6 모듈로 내보내기
+- `-s EXPORT_NAME="Module"`: 모듈 이름 지정
+
 **생성되는 파일**:
-- `build/filter.js`: JavaScript 래퍼
-- `build/filter.wasm`: WebAssembly 바이너리
-- → `web/` 디렉토리로 자동 복사
+- `build/filters.js`: JavaScript 글루 코드 (Emscripten 생성)
+- `build/filters.wasm`: WebAssembly 바이너리 (컴파일된 C++ 코드)
+- `build/index.html`, `build/app.js` 등: 웹 파일들 (복사본)
 
 ---
 
-### 4. web/index.html (메인 페이지)
+### 3. web/index.html (메인 페이지)
 
 **역할**: 사용자 인터페이스
 

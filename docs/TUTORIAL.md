@@ -125,10 +125,10 @@ EMSCRIPTEN_BINDINGS(webcam_filter) {
 
 **예상 출력**:
 ```
--- Build files have been written to: .../build
-[ 50%] Building CXX object CMakeFiles/filter.dir/main.cpp.o
-[100%] Linking CXX executable filter.js
-[100%] Built target filter
+cache:INFO: generating system asset: symbol_lists/77c73b…
+cache:INFO: generating system library: compiler_rt.a... (this will be cached in …)
+…빌드 진행 메시지…
+✅ 빌드 완료: build/filters.js, build/filters.wasm
 ```
 
 ### Step 5: JavaScript 함수 작성

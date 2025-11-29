@@ -719,9 +719,9 @@ void applyGrayscaleFilterRaw(uintptr_t ptr, int length) {
 
 ### 빌드 문제
 - [ ] Emscripten 환경 변수 설정됨?
-- [ ] CMake 설치됨?
 - [ ] build.sh 실행 권한 있음?
 - [ ] 에러 메시지 확인함?
+- [ ] src/filters/ 디렉토리에 .cpp 파일 있음?
 
 ### 실행 문제
 - [ ] 로컬 서버 실행 중? (file:// 아님)
@@ -763,8 +763,6 @@ void applyGrayscaleFilterRaw(uintptr_t ptr, int length) {
 3. **시스템 정보 수집**:
    ```bash
    emcc --version
-   cmake --version
-   node --version  # 사용 시
    python3 --version
    ```
 4. **GitHub Issues에 질문 작성**
