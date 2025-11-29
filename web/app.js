@@ -14,6 +14,9 @@ const btnNone = document.getElementById('btnNone');
 const btnGrayscale = document.getElementById('btnGrayscale');
 const btnFlip = document.getElementById('btnFlip');
 const btnSepia = document.getElementById('btnSepia');
+const btnPixelate = document.getElementById('btnPixelate');
+const btnGlitch = document.getElementById('btnGlitch');
+const btnThermal = document.getElementById('btnThermal');
 
 // 성능 측정
 const processingTimeEl = document.getElementById('processingTime');
@@ -30,6 +33,12 @@ let fpsUpdateTime = Date.now();
 // WASM 메모리 버퍼 (재사용으로 할당 오버헤드 최소화)
 let wasmBuffer = null;
 let wasmBufferSize = 0;
+
+// 필터별 설정
+const filterSettings = {
+    pixelate: { blockSize: 8 },
+    glitch: { intensity: 50, seed: 0 }
+};
 
 /**
  * WebAssembly 모듈 로딩
@@ -129,6 +138,14 @@ function processFrame() {
             wasmModule.applyHorizontalFlip(wasmBuffer, canvas.width, canvas.height);
         } else if (currentFilter === 'sepia') {
             wasmModule.applySepia(wasmBuffer, data.length);
+        } else if (currentFilter === 'pixelate') {
+            wasmModule.applyPixelate(wasmBuffer, canvas.width, canvas.height, filterSettings.pixelate.blockSize);
+        } else if (currentFilter === 'glitch') {
+            // 글리치는 매 프레임마다 다른 시드로 애니메이션 효과
+            filterSettings.glitch.seed = Date.now() % 10000;
+            wasmModule.applyGlitch(wasmBuffer, canvas.width, canvas.height, filterSettings.glitch.intensity, filterSettings.glitch.seed);
+        } else if (currentFilter === 'thermal') {
+            wasmModule.applyThermal(wasmBuffer, data.length);
         }
 
         // 3. WASM 메모리에서 JS로 결과 복사 (한 번만)
@@ -193,17 +210,17 @@ function setFilter(filter) {
     });
 
     // 선택된 버튼에 active 클래스 추가 및 aria-pressed 업데이트
-    let activeBtn;
-    if (filter === 'none') {
-        activeBtn = btnNone;
-    } else if (filter === 'grayscale') {
-        activeBtn = btnGrayscale;
-    } else if (filter === 'flip') {
-        activeBtn = btnFlip;
-    } else if (filter === 'sepia') {
-      activeBtn = btnSepia;
-    }
+    const filterBtnMap = {
+        'none': btnNone,
+        'grayscale': btnGrayscale,
+        'flip': btnFlip,
+        'sepia': btnSepia,
+        'pixelate': btnPixelate,
+        'glitch': btnGlitch,
+        'thermal': btnThermal
+    };
 
+    const activeBtn = filterBtnMap[filter];
     if (activeBtn) {
         activeBtn.classList.add('active');
         activeBtn.setAttribute('aria-pressed', 'true');
@@ -222,6 +239,9 @@ function setupEventListeners() {
     btnGrayscale.addEventListener('click', () => setFilter('grayscale'));
     btnFlip.addEventListener('click', () => setFilter('flip'));
     btnSepia.addEventListener('click', () => setFilter('sepia'));
+    btnPixelate.addEventListener('click', () => setFilter('pixelate'));
+    btnGlitch.addEventListener('click', () => setFilter('glitch'));
+    btnThermal.addEventListener('click', () => setFilter('thermal'));
 }
 
 /**
