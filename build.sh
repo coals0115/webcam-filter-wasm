@@ -32,6 +32,9 @@ emcc \
     src/filters/filters.cpp \
     -o build/filters.js \
     -O3 \
+    -flto \
+    -msimd128 \
+    -mnontrapping-fptoint \
     --bind \
     -s WASM=1 \
     -s ALLOW_MEMORY_GROWTH=1 \
