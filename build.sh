@@ -51,7 +51,6 @@ echo "📋 웹 파일 복사 중..."
 cp web/index.html build/
 cp web/styles.css build/
 cp web/app.js build/
-cp web/wrapper.js build/
 echo "✅ 웹 파일 복사 완료"
 
 # 5. 빌드 결과 확인
