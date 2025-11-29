@@ -6,7 +6,7 @@
 // DOM 요소
 const video = document.getElementById('webcam');
 const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const statusDiv = document.getElementById('status');
 
 // 버튼
