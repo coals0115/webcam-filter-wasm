@@ -17,6 +17,11 @@ const btnSepia = document.getElementById('btnSepia');
 const btnPixelate = document.getElementById('btnPixelate');
 const btnGlitch = document.getElementById('btnGlitch');
 const btnThermal = document.getElementById('btnThermal');
+const btnNightVision = document.getElementById('btnNightVision');
+const btnToon = document.getElementById('btnToon');
+const btnMirror = document.getElementById('btnMirror');
+const btnOldTV = document.getElementById('btnOldTV');
+const btnVHS = document.getElementById('btnVHS');
 
 // 성능 측정
 const processingTimeEl = document.getElementById('processingTime');
@@ -37,7 +42,12 @@ let wasmBufferSize = 0;
 // 필터별 설정
 const filterSettings = {
     pixelate: { blockSize: 8 },
-    glitch: { intensity: 50, seed: 0 }
+    glitch: { intensity: 50, seed: 0 },
+    nightvision: { seed: 0 },
+    toon: { levels: 5 },
+    mirror: { mode: 2 },  // 0=좌우, 1=상하, 2=4분할
+    oldtv: { seed: 0 },
+    vhs: { seed: 0 }
 };
 
 /**
@@ -146,6 +156,19 @@ function processFrame() {
             wasmModule.applyGlitch(wasmBuffer, canvas.width, canvas.height, filterSettings.glitch.intensity, filterSettings.glitch.seed);
         } else if (currentFilter === 'thermal') {
             wasmModule.applyThermal(wasmBuffer, data.length);
+        } else if (currentFilter === 'nightvision') {
+            filterSettings.nightvision.seed = Date.now() % 10000;
+            wasmModule.applyNightVision(wasmBuffer, canvas.width, canvas.height, filterSettings.nightvision.seed);
+        } else if (currentFilter === 'toon') {
+            wasmModule.applyToon(wasmBuffer, canvas.width, canvas.height, filterSettings.toon.levels);
+        } else if (currentFilter === 'mirror') {
+            wasmModule.applyMirror(wasmBuffer, canvas.width, canvas.height, filterSettings.mirror.mode);
+        } else if (currentFilter === 'oldtv') {
+            filterSettings.oldtv.seed = Date.now() % 10000;
+            wasmModule.applyOldTV(wasmBuffer, canvas.width, canvas.height, filterSettings.oldtv.seed);
+        } else if (currentFilter === 'vhs') {
+            filterSettings.vhs.seed = Date.now() % 10000;
+            wasmModule.applyVHS(wasmBuffer, canvas.width, canvas.height, filterSettings.vhs.seed);
         }
 
         // 3. WASM 메모리에서 JS로 결과 복사 (한 번만)
@@ -217,7 +240,12 @@ function setFilter(filter) {
         'sepia': btnSepia,
         'pixelate': btnPixelate,
         'glitch': btnGlitch,
-        'thermal': btnThermal
+        'thermal': btnThermal,
+        'nightvision': btnNightVision,
+        'toon': btnToon,
+        'mirror': btnMirror,
+        'oldtv': btnOldTV,
+        'vhs': btnVHS
     };
 
     const activeBtn = filterBtnMap[filter];
@@ -242,6 +270,11 @@ function setupEventListeners() {
     btnPixelate.addEventListener('click', () => setFilter('pixelate'));
     btnGlitch.addEventListener('click', () => setFilter('glitch'));
     btnThermal.addEventListener('click', () => setFilter('thermal'));
+    btnNightVision.addEventListener('click', () => setFilter('nightvision'));
+    btnToon.addEventListener('click', () => setFilter('toon'));
+    btnMirror.addEventListener('click', () => setFilter('mirror'));
+    btnOldTV.addEventListener('click', () => setFilter('oldtv'));
+    btnVHS.addEventListener('click', () => setFilter('vhs'));
 }
 
 /**
