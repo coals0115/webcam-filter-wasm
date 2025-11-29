@@ -444,3 +444,18 @@ footer a:hover {
         font-weight: 400;
     }
 }
+
+.chroma-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.chroma-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
