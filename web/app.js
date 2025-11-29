@@ -282,7 +282,11 @@ function setFilter(filter) {
 
     // 크로마키 필터 선택 여부에 따라 옵션 표시/숨김 처리
     if (chromaControls) {
-        chromaControls.style.display = (filter === 'chroma') ? 'flex' : 'none';
+        if (filter === 'chroma') {
+            chromaControls.style.display = 'flex';
+        } else {
+            chromaControls.style.display = 'none';
+        }
     }
 }
 
