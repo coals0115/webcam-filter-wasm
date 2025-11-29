@@ -23,6 +23,34 @@ const btnMirror = document.getElementById('btnMirror');
 const btnOldTV = document.getElementById('btnOldTV');
 const btnVHS = document.getElementById('btnVHS');
 
+// 크로마키 버튼 동적 생성
+const btnChroma = document.createElement('button');
+btnChroma.id = 'btnChroma';
+btnChroma.className = 'filter-btn';
+btnChroma.textContent = '크로마키';
+btnChroma.setAttribute('aria-pressed', 'false');
+document.querySelector('.filter-buttons').appendChild(btnChroma);
+
+// 크로마키 UI 요소 생성
+const chromaControls = document.createElement('section');
+chromaControls.className = 'chroma-controls';
+chromaControls.innerHTML = `
+    <div class="chroma-row">
+        <label for="chromaColor">배경 색상</label>
+        <input type="color" id="chromaColor" value="#00ff00">
+    </div>
+    <div class="chroma-row">
+        <label for="chromaTolerance">허용 범위</label>
+        <input type="range" id="chromaTolerance" min="10" max="150" value="60">
+        <span id="chromaToleranceValue">60</span>
+    </div>
+    <div class="chroma-row">
+        <label for="chromaFile">배경 이미지</label>
+        <input type="file" id="chromaFile" accept="image/*">
+    </div>
+`;
+document.querySelector('.controls').appendChild(chromaControls);
+
 // 성능 측정
 const processingTimeEl = document.getElementById('processingTime');
 const fpsEl = document.getElementById('fps');
@@ -49,6 +77,13 @@ const filterSettings = {
     oldtv: { seed: 0 },
     vhs: { seed: 0 }
 };
+
+// 크로마키 상태
+let chromaColor = { r: 0, g: 255, b: 0 };
+let chromaTolerance = 60;
+let chromaBgBuffer = null;
+let chromaBgBufferSize = 0;
+let chromaLoaded = false;
 
 /**
  * WebAssembly 모듈 로딩
@@ -169,11 +204,21 @@ function processFrame() {
         } else if (currentFilter === 'vhs') {
             filterSettings.vhs.seed = Date.now() % 10000;
             wasmModule.applyVHS(wasmBuffer, canvas.width, canvas.height, filterSettings.vhs.seed);
+        } else if (currentFilter === 'chroma' && chromaLoaded && chromaBgBuffer) {
+            wasmModule.applyChromaKey(
+                wasmBuffer,
+                chromaBgBuffer,
+                canvas.width,
+                canvas.height,
+                chromaColor.r,
+                chromaColor.g,
+                chromaColor.b,
+                chromaTolerance
+            );
         }
 
         // 3. WASM 메모리에서 JS로 결과 복사 (한 번만)
         data.set(wasmModule.HEAPU8.subarray(wasmBuffer, wasmBuffer + data.length));
-
         ctx.putImageData(imageData, 0, 0);
     }
 
@@ -202,15 +247,10 @@ function processFrame() {
 
         // Performance-based color coding for FPS
         fpsEl.className = 'stat-value';
-        if (fps >= 55) {
-            fpsEl.classList.add('perf-excellent');
-        } else if (fps >= 40) {
-            fpsEl.classList.add('perf-good');
-        } else if (fps >= 25) {
-            fpsEl.classList.add('perf-warning');
-        } else {
-            fpsEl.classList.add('perf-critical');
-        }
+        if (fps >= 55) fpsEl.classList.add('perf-excellent');
+        else if (fps >= 40) fpsEl.classList.add('perf-good');
+        else if (fps >= 25) fpsEl.classList.add('perf-warning');
+        else fpsEl.classList.add('perf-critical');
 
         frameCount = 0;
         fpsUpdateTime = now;
@@ -245,18 +285,73 @@ function setFilter(filter) {
         'toon': btnToon,
         'mirror': btnMirror,
         'oldtv': btnOldTV,
-        'vhs': btnVHS
+        'vhs': btnVHS,
+        'chroma': btnChroma
     };
 
     const activeBtn = filterBtnMap[filter];
     if (activeBtn) {
         activeBtn.classList.add('active');
         activeBtn.setAttribute('aria-pressed', 'true');
-
-        // Glitch effect on filter change
-        canvas.classList.add('glitch-effect');
-        setTimeout(() => canvas.classList.remove('glitch-effect'), 300);
     }
+
+    // 크로마키 UI 표시/숨김
+    chromaControls.style.display = (filter === 'chroma') ? 'block' : 'none';
+}
+
+/**
+ * 크로마키 설정
+ */
+function setupChromaEvents() {
+    const colorInput = document.getElementById('chromaColor');
+    const toleranceInput = document.getElementById('chromaTolerance');
+    const toleranceValue = document.getElementById('chromaToleranceValue');
+    const fileInput = document.getElementById('chromaFile');
+
+    colorInput.addEventListener('input', () => {
+        const hex = colorInput.value.replace('#', '');
+        chromaColor = {
+            r: parseInt(hex.substring(0, 2), 16),
+            g: parseInt(hex.substring(2, 4), 16),
+            b: parseInt(hex.substring(4, 6), 16)
+        };
+    });
+
+    toleranceInput.addEventListener('input', () => {
+        chromaTolerance = Number(toleranceInput.value);
+        toleranceValue.textContent = String(chromaTolerance);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const img = new Image();
+        img.onload = () => {
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = canvas.width;
+            offCanvas.height = canvas.height;
+            const offCtx = offCanvas.getContext('2d');
+            offCtx.drawImage(img, 0, 0, offCanvas.width, offCanvas.height);
+
+            const bgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height).data;
+            const size = bgData.length;
+
+            if (!chromaBgBuffer || chromaBgBufferSize !== size) {
+                if (chromaBgBuffer) wasmModule.freeBuffer(chromaBgBuffer);
+                chromaBgBuffer = wasmModule.allocateBuffer(size);
+                chromaBgBufferSize = size;
+            }
+
+            wasmModule.HEAPU8.set(bgData, chromaBgBuffer);
+            chromaLoaded = true;
+
+            statusDiv.innerHTML = '<p class="success">🎨 크로마키 배경 이미지 적용 완료</p>';
+            statusDiv.classList.add('success');
+        };
+
+        img.src = URL.createObjectURL(file);
+    });
 }
 
 /**
@@ -275,6 +370,9 @@ function setupEventListeners() {
     btnMirror.addEventListener('click', () => setFilter('mirror'));
     btnOldTV.addEventListener('click', () => setFilter('oldtv'));
     btnVHS.addEventListener('click', () => setFilter('vhs'));
+    btnChroma.addEventListener('click', () => setFilter('chroma'));
+
+    setupChromaEvents();
 }
 
 /**
@@ -291,6 +389,9 @@ async function init() {
         container.style.opacity = '1';
         container.style.transform = 'translateY(0)';
     }, 100);
+
+    // 크로마키 UI 초기 숨김
+    chromaControls.style.display = 'none';
 
     setupEventListeners();
 
@@ -318,14 +419,8 @@ if (document.readyState === 'loading') {
 
 // 페이지 언로드 시 정리
 window.addEventListener('beforeunload', () => {
-    if (animationId) {
-        cancelAnimationFrame(animationId);
-    }
-    // WASM 버퍼 해제
-    if (wasmModule && wasmBuffer) {
-        wasmModule.freeBuffer(wasmBuffer);
-    }
-    if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-    }
+    if (animationId) cancelAnimationFrame(animationId);
+    if (wasmModule && wasmBuffer) wasmModule.freeBuffer(wasmBuffer);
+    if (wasmModule && chromaBgBuffer) wasmModule.freeBuffer(chromaBgBuffer);
+    if (video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
 });
