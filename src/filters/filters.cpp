@@ -301,6 +301,351 @@ void applyThermal(uintptr_t dataPtr, int length) {
 }
 
 /**
+ * 야간 투시경(Night Vision) 필터 구현
+ * 녹색 톤 + 노이즈 + 비네팅 효과 (밀리터리 느낌)
+ *
+ * @param dataPtr 픽셀 데이터 포인터 (RGBA 형식)
+ * @param width 이미지 너비
+ * @param height 이미지 높이
+ * @param seed 노이즈용 랜덤 시드
+ */
+void applyNightVision(uintptr_t dataPtr, int width, int height, int seed) {
+    uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
+
+    // 간단한 PRNG
+    auto rand = [&seed]() {
+        seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF;
+        return seed;
+    };
+
+    float centerX = width / 2.0f;
+    float centerY = height / 2.0f;
+    float maxDist = std::sqrt(centerX * centerX + centerY * centerY);
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int idx = (y * width + x) * 4;
+
+            // 밝기 계산
+            int brightness = (data[idx] * 54 + data[idx + 1] * 183 + data[idx + 2] * 19) >> 8;
+
+            // 밝기 증폭 (야간 투시경은 빛을 증폭)
+            brightness = brightness * 150 / 100;
+            if (brightness > 255) brightness = 255;
+
+            // 노이즈 추가 (약간의 랜덤 변동)
+            int noise = (rand() % 30) - 15;
+            brightness += noise;
+            if (brightness < 0) brightness = 0;
+            if (brightness > 255) brightness = 255;
+
+            // 비네팅 효과 (가장자리 어둡게)
+            float dx = x - centerX;
+            float dy = y - centerY;
+            float dist = std::sqrt(dx * dx + dy * dy);
+            float vignette = 1.0f - (dist / maxDist) * 0.6f;
+
+            brightness = static_cast<int>(brightness * vignette);
+
+            // 녹색 톤 적용 (R과 B는 낮게, G는 밝기 그대로)
+            data[idx] = static_cast<uint8_t>(brightness * 20 / 100);      // R: 약간
+            data[idx + 1] = static_cast<uint8_t>(brightness);              // G: 풀
+            data[idx + 2] = static_cast<uint8_t>(brightness * 20 / 100);  // B: 약간
+        }
+    }
+}
+
+/**
+ * 만화/애니(Toon/Cartoon) 효과 필터 구현
+ * 엣지 검출 + 색상 단순화 (Posterization)
+ *
+ * @param dataPtr 픽셀 데이터 포인터 (RGBA 형식)
+ * @param width 이미지 너비
+ * @param height 이미지 높이
+ * @param levels 색상 단계 수 (낮을수록 더 만화 느낌)
+ */
+void applyToon(uintptr_t dataPtr, int width, int height, int levels) {
+    uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
+
+    if (levels < 2) levels = 2;
+    if (levels > 8) levels = 8;
+
+    int step = 256 / levels;
+
+    // 1단계: 색상 단순화 (Posterization)
+    for (int i = 0; i < width * height * 4; i += 4) {
+        data[i] = static_cast<uint8_t>((data[i] / step) * step);
+        data[i + 1] = static_cast<uint8_t>((data[i + 1] / step) * step);
+        data[i + 2] = static_cast<uint8_t>((data[i + 2] / step) * step);
+    }
+
+    // 2단계: 간단한 엣지 검출 (Sobel-like)
+    // 임시 버퍼에 엣지 정보 저장
+    for (int y = 1; y < height - 1; y++) {
+        for (int x = 1; x < width - 1; x++) {
+            int idx = (y * width + x) * 4;
+
+            // 주변 픽셀과의 밝기 차이 계산
+            int centerBright = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+
+            int leftIdx = (y * width + (x - 1)) * 4;
+            int rightIdx = (y * width + (x + 1)) * 4;
+            int topIdx = ((y - 1) * width + x) * 4;
+            int bottomIdx = ((y + 1) * width + x) * 4;
+
+            int leftBright = (data[leftIdx] + data[leftIdx + 1] + data[leftIdx + 2]) / 3;
+            int rightBright = (data[rightIdx] + data[rightIdx + 1] + data[rightIdx + 2]) / 3;
+            int topBright = (data[topIdx] + data[topIdx + 1] + data[topIdx + 2]) / 3;
+            int bottomBright = (data[bottomIdx] + data[bottomIdx + 1] + data[bottomIdx + 2]) / 3;
+
+            // 그래디언트 계산
+            int gx = rightBright - leftBright;
+            int gy = bottomBright - topBright;
+            int edge = std::abs(gx) + std::abs(gy);
+
+            // 엣지가 강하면 검은색 윤곽선
+            if (edge > 30) {
+                data[idx] = static_cast<uint8_t>(data[idx] * 30 / 100);
+                data[idx + 1] = static_cast<uint8_t>(data[idx + 1] * 30 / 100);
+                data[idx + 2] = static_cast<uint8_t>(data[idx + 2] * 30 / 100);
+            }
+        }
+    }
+}
+
+/**
+ * 거울(Mirror) 효과 필터 구현
+ * 좌우 대칭 거울 효과 (왼쪽을 오른쪽에 복사)
+ *
+ * @param dataPtr 픽셀 데이터 포인터 (RGBA 형식)
+ * @param width 이미지 너비
+ * @param height 이미지 높이
+ * @param mode 모드: 0=좌우대칭, 1=상하대칭, 2=4분할
+ */
+void applyMirror(uintptr_t dataPtr, int width, int height, int mode) {
+    uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
+
+    if (mode == 0) {
+        // 좌우 대칭: 왼쪽 절반을 오른쪽에 반전 복사
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width / 2; x++) {
+                int srcIdx = (y * width + x) * 4;
+                int dstIdx = (y * width + (width - 1 - x)) * 4;
+
+                data[dstIdx] = data[srcIdx];
+                data[dstIdx + 1] = data[srcIdx + 1];
+                data[dstIdx + 2] = data[srcIdx + 2];
+                data[dstIdx + 3] = data[srcIdx + 3];
+            }
+        }
+    } else if (mode == 1) {
+        // 상하 대칭: 위쪽 절반을 아래쪽에 반전 복사
+        for (int y = 0; y < height / 2; y++) {
+            for (int x = 0; x < width; x++) {
+                int srcIdx = (y * width + x) * 4;
+                int dstIdx = ((height - 1 - y) * width + x) * 4;
+
+                data[dstIdx] = data[srcIdx];
+                data[dstIdx + 1] = data[srcIdx + 1];
+                data[dstIdx + 2] = data[srcIdx + 2];
+                data[dstIdx + 3] = data[srcIdx + 3];
+            }
+        }
+    } else {
+        // 4분할 거울: 좌상단을 나머지 3개 영역에 복사
+        int halfW = width / 2;
+        int halfH = height / 2;
+
+        for (int y = 0; y < halfH; y++) {
+            for (int x = 0; x < halfW; x++) {
+                int srcIdx = (y * width + x) * 4;
+
+                // 우상단 (좌우 반전)
+                int idx1 = (y * width + (width - 1 - x)) * 4;
+                // 좌하단 (상하 반전)
+                int idx2 = ((height - 1 - y) * width + x) * 4;
+                // 우하단 (좌우+상하 반전)
+                int idx3 = ((height - 1 - y) * width + (width - 1 - x)) * 4;
+
+                for (int c = 0; c < 4; c++) {
+                    data[idx1 + c] = data[srcIdx + c];
+                    data[idx2 + c] = data[srcIdx + c];
+                    data[idx3 + c] = data[srcIdx + c];
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Old TV (CRT) 효과 필터 구현
+ * 스캔라인 + 색상 번짐 + 약간의 왜곡
+ *
+ * @param dataPtr 픽셀 데이터 포인터 (RGBA 형식)
+ * @param width 이미지 너비
+ * @param height 이미지 높이
+ * @param seed 애니메이션용 시드
+ */
+void applyOldTV(uintptr_t dataPtr, int width, int height, int seed) {
+    uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
+
+    // PRNG
+    auto rand = [&seed]() {
+        seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF;
+        return seed;
+    };
+
+    // 1. 스캔라인 효과 (3줄마다 어둡게)
+    for (int y = 0; y < height; y++) {
+        float scanline = (y % 3 == 0) ? 0.7f : 1.0f;
+
+        for (int x = 0; x < width; x++) {
+            int idx = (y * width + x) * 4;
+
+            data[idx] = static_cast<uint8_t>(data[idx] * scanline);
+            data[idx + 1] = static_cast<uint8_t>(data[idx + 1] * scanline);
+            data[idx + 2] = static_cast<uint8_t>(data[idx + 2] * scanline);
+        }
+    }
+
+    // 2. RGB 색수차 (채널별 약간 시프트)
+    int shift = 2;
+    for (int y = 0; y < height; y++) {
+        for (int x = shift; x < width - shift; x++) {
+            int idx = (y * width + x) * 4;
+            int leftIdx = (y * width + (x - shift)) * 4;
+            int rightIdx = (y * width + (x + shift)) * 4;
+
+            // R은 왼쪽에서, B는 오른쪽에서
+            uint8_t newR = data[leftIdx];
+            uint8_t newB = data[rightIdx + 2];
+
+            data[idx] = newR;
+            data[idx + 2] = newB;
+        }
+    }
+
+    // 3. 랜덤 수평 노이즈 라인
+    int numLines = 3 + rand() % 3;
+    for (int i = 0; i < numLines; i++) {
+        int y = rand() % height;
+        int brightness = 150 + rand() % 50;
+
+        for (int x = 0; x < width; x++) {
+            int idx = (y * width + x) * 4;
+            data[idx] = static_cast<uint8_t>((data[idx] + brightness) / 2);
+            data[idx + 1] = static_cast<uint8_t>((data[idx + 1] + brightness) / 2);
+            data[idx + 2] = static_cast<uint8_t>((data[idx + 2] + brightness) / 2);
+        }
+    }
+
+    // 4. 비네팅 (CRT 모니터 가장자리 어두움)
+    float centerX = width / 2.0f;
+    float centerY = height / 2.0f;
+    float maxDist = std::sqrt(centerX * centerX + centerY * centerY);
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int idx = (y * width + x) * 4;
+
+            float dx = x - centerX;
+            float dy = y - centerY;
+            float dist = std::sqrt(dx * dx + dy * dy);
+            float vignette = 1.0f - (dist / maxDist) * 0.4f;
+
+            data[idx] = static_cast<uint8_t>(data[idx] * vignette);
+            data[idx + 1] = static_cast<uint8_t>(data[idx + 1] * vignette);
+            data[idx + 2] = static_cast<uint8_t>(data[idx + 2] * vignette);
+        }
+    }
+}
+
+/**
+ * VHS 테이프 효과 필터 구현
+ * 트래킹 노이즈 + 색수차 + 워블링
+ *
+ * @param dataPtr 픽셀 데이터 포인터 (RGBA 형식)
+ * @param width 이미지 너비
+ * @param height 이미지 높이
+ * @param seed 애니메이션용 시드
+ */
+void applyVHS(uintptr_t dataPtr, int width, int height, int seed) {
+    uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
+
+    // PRNG
+    auto rand = [&seed]() {
+        seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF;
+        return seed;
+    };
+
+    // 1. 색상 채도 감소 + 약간의 색조 변경 (VHS 특유의 바랜 색감)
+    for (int i = 0; i < width * height * 4; i += 4) {
+        int r = data[i];
+        int g = data[i + 1];
+        int b = data[i + 2];
+
+        // 채도 감소
+        int gray = (r + g + b) / 3;
+        r = (r * 70 + gray * 30) / 100;
+        g = (g * 70 + gray * 30) / 100;
+        b = (b * 70 + gray * 30) / 100;
+
+        // 약간 빨간/노란 틴트 추가
+        r = r + 10 > 255 ? 255 : r + 10;
+
+        data[i] = static_cast<uint8_t>(r);
+        data[i + 1] = static_cast<uint8_t>(g);
+        data[i + 2] = static_cast<uint8_t>(b);
+    }
+
+    // 2. RGB 색수차 (VHS 특유의 색 번짐)
+    int shift = 3;
+    for (int y = 0; y < height; y++) {
+        for (int x = shift; x < width - shift; x++) {
+            int idx = (y * width + x) * 4;
+            int leftIdx = (y * width + (x - shift)) * 4;
+            int rightIdx = (y * width + (x + shift)) * 4;
+
+            data[idx] = (data[idx] + data[leftIdx]) / 2;
+            data[idx + 2] = (data[idx + 2] + data[rightIdx + 2]) / 2;
+        }
+    }
+
+    // 3. 트래킹 노이즈 (화면 일부에 수평 노이즈 밴드)
+    int bandY = (seed / 100) % height;
+    int bandHeight = 10 + rand() % 20;
+
+    for (int y = bandY; y < bandY + bandHeight && y < height; y++) {
+        int offset = (rand() % 10) - 5;  // 수평 흔들림
+
+        for (int x = 0; x < width; x++) {
+            int srcX = x + offset;
+            if (srcX < 0) srcX = 0;
+            if (srcX >= width) srcX = width - 1;
+
+            int dstIdx = (y * width + x) * 4;
+            int srcIdx = (y * width + srcX) * 4;
+
+            // 노이즈 추가
+            int noise = rand() % 50;
+            data[dstIdx] = static_cast<uint8_t>((data[srcIdx] + noise) > 255 ? 255 : data[srcIdx] + noise);
+            data[dstIdx + 1] = static_cast<uint8_t>((data[srcIdx + 1] + noise) > 255 ? 255 : data[srcIdx + 1] + noise);
+            data[dstIdx + 2] = static_cast<uint8_t>((data[srcIdx + 2] + noise) > 255 ? 255 : data[srcIdx + 2] + noise);
+        }
+    }
+
+    // 4. 스캔라인 효과
+    for (int y = 0; y < height; y += 2) {
+        for (int x = 0; x < width; x++) {
+            int idx = (y * width + x) * 4;
+            data[idx] = data[idx] * 90 / 100;
+            data[idx + 1] = data[idx + 1] * 90 / 100;
+            data[idx + 2] = data[idx + 2] * 90 / 100;
+        }
+    }
+}
+
+/**
  * WASM 메모리 할당 함수
  * JavaScript에서 데이터를 복사할 버퍼 생성
  *
@@ -328,6 +673,11 @@ EMSCRIPTEN_BINDINGS(filters) {
     function("applyPixelate", &applyPixelate);
     function("applyGlitch", &applyGlitch);
     function("applyThermal", &applyThermal);
+    function("applyNightVision", &applyNightVision);
+    function("applyToon", &applyToon);
+    function("applyMirror", &applyMirror);
+    function("applyOldTV", &applyOldTV);
+    function("applyVHS", &applyVHS);
     function("allocateBuffer", &allocateBuffer);
     function("freeBuffer", &freeBuffer);
 }
