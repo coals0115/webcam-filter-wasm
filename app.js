@@ -1,5 +1,6 @@
 /**
  * WebCam Filter WASM - 메인 애플리케이션
+ * 고성능 WASM 메모리 직접 접근 방식 사용
  */
 
 // DOM 요소
@@ -24,6 +25,10 @@ let animationId = null;
 let lastFrameTime = Date.now();
 let frameCount = 0;
 let fpsUpdateTime = Date.now();
+
+// WASM 메모리 버퍼 (재사용으로 할당 오버헤드 최소화)
+let wasmBuffer = null;
+let wasmBufferSize = 0;
 
 /**
  * WebAssembly 모듈 로딩
@@ -79,6 +84,11 @@ async function initWebcam() {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
+        // WASM 버퍼 미리 할당 (영상 크기에 맞게)
+        const bufferSize = canvas.width * canvas.height * 4;
+        wasmBuffer = wasmModule.allocateBuffer(bufferSize);
+        wasmBufferSize = bufferSize;
+
         statusDiv.innerHTML = '<p class="success">✅ 웹캠 연결 완료</p>';
         statusDiv.classList.add('success');
 
@@ -95,7 +105,7 @@ async function initWebcam() {
 }
 
 /**
- * 프레임 처리 (메인 루프)
+ * 프레임 처리 (메인 루프) - 고성능 버전
  */
 function processFrame() {
     const startTime = performance.now();
@@ -104,20 +114,24 @@ function processFrame() {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     // 필터 적용
-    if (currentFilter !== 'none' && wasmModule) {
+    if (currentFilter !== 'none' && wasmModule && wasmBuffer) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
 
-        try {
-            if (currentFilter === 'grayscale') {
-                wasmModule.applyGrayscale(imageData);
-            } else if (currentFilter === 'flip') {
-                wasmModule.applyHorizontalFlip(imageData);
-            }
+        // 1. JS 데이터를 WASM 메모리로 복사 (한 번만)
+        wasmModule.HEAPU8.set(data, wasmBuffer);
 
-            ctx.putImageData(imageData, 0, 0);
-        } catch (error) {
-            console.error('필터 적용 실패:', error);
+        // 2. WASM에서 필터 처리 (순수 C++ 연산, JS 호출 없음)
+        if (currentFilter === 'grayscale') {
+            wasmModule.applyGrayscale(wasmBuffer, data.length);
+        } else if (currentFilter === 'flip') {
+            wasmModule.applyHorizontalFlip(wasmBuffer, canvas.width, canvas.height);
         }
+
+        // 3. WASM 메모리에서 JS로 결과 복사 (한 번만)
+        data.set(wasmModule.HEAPU8.subarray(wasmBuffer, wasmBuffer + data.length));
+
+        ctx.putImageData(imageData, 0, 0);
     }
 
     // 성능 측정
@@ -247,6 +261,10 @@ if (document.readyState === 'loading') {
 window.addEventListener('beforeunload', () => {
     if (animationId) {
         cancelAnimationFrame(animationId);
+    }
+    // WASM 버퍼 해제
+    if (wasmModule && wasmBuffer) {
+        wasmModule.freeBuffer(wasmBuffer);
     }
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
