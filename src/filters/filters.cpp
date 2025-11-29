@@ -58,6 +58,37 @@ void applyHorizontalFlip(uintptr_t dataPtr, int width, int height) {
 }
 
 /**
+ * 세피아(Sepia) 필터 구현 - 고성능 버전
+ * 빈티지/레트로 사진 효과
+ *
+ * @param dataPtr 픽셀 데이터 포인터 (RGBA 형식)
+ * @param length 데이터 길이 (바이트)
+ */
+void applySepia(uintptr_t dataPtr, int length) {
+    uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
+
+    for (int i = 0; i < length; i += 4) {
+        uint8_t r = data[i];
+        uint8_t g = data[i + 1];
+        uint8_t b = data[i + 2];
+
+        // 세피아 변환 공식 (정수 연산 최적화)
+        // newR = (r * 0.393 + g * 0.769 + b * 0.189)
+        // newG = (r * 0.349 + g * 0.686 + b * 0.168)
+        // newB = (r * 0.272 + g * 0.534 + b * 0.131)
+        int newR = (r * 101 + g * 197 + b * 48) >> 8;
+        int newG = (r * 89 + g * 176 + b * 43) >> 8;
+        int newB = (r * 70 + g * 137 + b * 34) >> 8;
+
+        // 255 클램핑
+        data[i] = static_cast<uint8_t>(newR > 255 ? 255 : newR);
+        data[i + 1] = static_cast<uint8_t>(newG > 255 ? 255 : newG);
+        data[i + 2] = static_cast<uint8_t>(newB > 255 ? 255 : newB);
+        // Alpha (data[i + 3])는 그대로 유지
+    }
+}
+
+/**
  * WASM 메모리 할당 함수
  * JavaScript에서 데이터를 복사할 버퍼 생성
  *
@@ -81,6 +112,7 @@ void freeBuffer(uintptr_t ptr) {
 EMSCRIPTEN_BINDINGS(filters) {
     function("applyGrayscale", &applyGrayscale);
     function("applyHorizontalFlip", &applyHorizontalFlip);
+    function("applySepia", &applySepia);
     function("allocateBuffer", &allocateBuffer);
     function("freeBuffer", &freeBuffer);
 }

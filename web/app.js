@@ -13,6 +13,7 @@ const statusDiv = document.getElementById('status');
 const btnNone = document.getElementById('btnNone');
 const btnGrayscale = document.getElementById('btnGrayscale');
 const btnFlip = document.getElementById('btnFlip');
+const btnSepia = document.getElementById('btnSepia');
 
 // 성능 측정
 const processingTimeEl = document.getElementById('processingTime');
@@ -126,6 +127,8 @@ function processFrame() {
             wasmModule.applyGrayscale(wasmBuffer, data.length);
         } else if (currentFilter === 'flip') {
             wasmModule.applyHorizontalFlip(wasmBuffer, canvas.width, canvas.height);
+        } else if (currentFilter === 'sepia') {
+            wasmModule.applySepia(wasmBuffer, data.length);
         }
 
         // 3. WASM 메모리에서 JS로 결과 복사 (한 번만)
@@ -197,6 +200,8 @@ function setFilter(filter) {
         activeBtn = btnGrayscale;
     } else if (filter === 'flip') {
         activeBtn = btnFlip;
+    } else if (filter === 'sepia') {
+      activeBtn = btnSepia;
     }
 
     if (activeBtn) {
@@ -216,6 +221,7 @@ function setupEventListeners() {
     btnNone.addEventListener('click', () => setFilter('none'));
     btnGrayscale.addEventListener('click', () => setFilter('grayscale'));
     btnFlip.addEventListener('click', () => setFilter('flip'));
+    btnSepia.addEventListener('click', () => setFilter('sepia'));
 }
 
 /**
