@@ -179,6 +179,7 @@ main {
     display: block;
     width: 100%;
     height: auto;
+    transform: scaleX(-1);  /* 거울 모드 기본 적용 */
 }
 
 /* Controls Section */
