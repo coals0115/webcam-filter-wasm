@@ -686,6 +686,41 @@ void applyChromaKey(uintptr_t framePtr, uintptr_t bgPtr, int width, int height,
 }
 
 /**
+ * X-Ray 필터 구현
+ * 명암 반전(Negative) 및 대비 증강 효과 적용
+ * @param dataPtr 픽셀 데이터 포인터 (RGBA 형식)
+ * @param length 데이터 길이 (바이트)
+ */
+void applyXrayFilter(uintptr_t dataPtr, int length) {
+    uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
+
+    // 대비 조절을 위한 상수. 값이 클수록 대비가 강해짐.
+    // 0 ~ 255 범위의 픽셀 값을 조정. 128을 중심으로 픽셀 값을 조정.
+    const int contrast_factor = 80;
+
+    for (int i = 0; i < length; i += 4) {
+
+        // 1. 명암 반전
+        int r = 255 - data[i];
+        int g = 255 - data[i + 1];
+        int b = 255 - data[i + 2];
+
+        // 2. 대비 증강
+        int newR = 128 + ((r - 128) * contrast_factor) / 128;
+        int newG = 128 + ((g - 128) * contrast_factor) / 128;
+        int newB = 128 + ((b - 128) * contrast_factor) / 128;
+
+        // 3. 0-255 클램핑
+        // 결과가 0 미만이거나 255 초과하지 않도록 보장
+        data[i] = static_cast<uint8_t>(std::max(0, std::min(255, newR)));
+        data[i + 1] = static_cast<uint8_t>(std::max(0, std::min(255, newG)));
+        data[i + 2] = static_cast<uint8_t>(std::max(0, std::min(255, newB)));
+
+        // Alpha (data[i + 3])는 그대로 유지
+    }
+}
+
+/**
  * WASM 메모리 할당 함수
  * JavaScript에서 데이터를 복사할 버퍼 생성
  *
@@ -719,6 +754,7 @@ EMSCRIPTEN_BINDINGS(filters) {
     function("applyOldTV", &applyOldTV);
     function("applyVHS", &applyVHS);
     function("applyChromaKey", &applyChromaKey);
+    function("applyXrayFilter", &applyXrayFilter);
     function("allocateBuffer", &allocateBuffer);
     function("freeBuffer", &freeBuffer);
 }
