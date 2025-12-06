@@ -11,19 +11,12 @@ const statusDiv = document.getElementById('status');
 
 // 버튼
 const btnNone = document.getElementById('btnNone');
-const btnGrayscale = document.getElementById('btnGrayscale');
-const btnFlip = document.getElementById('btnFlip');
 const btnSepia = document.getElementById('btnSepia');
-const btnPixelate = document.getElementById('btnPixelate');
-const btnGlitch = document.getElementById('btnGlitch');
-const btnThermal = document.getElementById('btnThermal');
-const btnNightVision = document.getElementById('btnNightVision');
-const btnToon = document.getElementById('btnToon');
-const btnMirror = document.getElementById('btnMirror');
-const btnOldTV = document.getElementById('btnOldTV');
-const btnVHS = document.getElementById('btnVHS');
-const btnChroma = document.getElementById('btnChroma');
 const btnXray = document.getElementById('btnXray');
+const btnMirror = document.getElementById('btnMirror');
+const btnPixelate = document.getElementById('btnPixelate');
+const btnChroma = document.getElementById('btnChroma');
+const btnThermal = document.getElementById('btnThermal');
 
 // 크로마키 UI 요소
 const chromaControls = document.querySelector('.chroma-controls');
@@ -56,12 +49,7 @@ let wasmBufferSize = 0;
 // 필터별 설정
 const filterSettings = {
     pixelate: { blockSize: 8 },
-    glitch: { intensity: 50, seed: 0 },
-    nightvision: { seed: 0 },
-    toon: { levels: 5 },
-    mirror: { mode: 2 },  // 0=좌우, 1=상하, 2=4분할
-    oldtv: { seed: 0 },
-    vhs: { seed: 0 }
+    mirror: { mode: 2 }  // 0=좌우, 1=상하, 2=4분할
 };
 
 // 크로마키 상태
@@ -163,33 +151,14 @@ function processFrame() {
         wasmModule.HEAPU8.set(data, wasmBuffer);
 
         // 2. WASM에서 필터 처리 (순수 C++ 연산, JS 호출 없음)
-        if (currentFilter === 'grayscale') {
-            wasmModule.applyGrayscale(wasmBuffer, data.length);
-        } else if (currentFilter === 'flip') {
-            wasmModule.applyHorizontalFlip(wasmBuffer, canvas.width, canvas.height);
-        } else if (currentFilter === 'sepia') {
+        if (currentFilter === 'sepia') {
             wasmModule.applySepia(wasmBuffer, data.length);
-        } else if (currentFilter === 'pixelate') {
-            wasmModule.applyPixelate(wasmBuffer, canvas.width, canvas.height, filterSettings.pixelate.blockSize);
-        } else if (currentFilter === 'glitch') {
-            // 글리치는 매 프레임마다 다른 시드로 애니메이션 효과
-            filterSettings.glitch.seed = Date.now() % 10000;
-            wasmModule.applyGlitch(wasmBuffer, canvas.width, canvas.height, filterSettings.glitch.intensity, filterSettings.glitch.seed);
-        } else if (currentFilter === 'thermal') {
-            wasmModule.applyThermal(wasmBuffer, data.length);
-        } else if (currentFilter === 'nightvision') {
-            filterSettings.nightvision.seed = Date.now() % 10000;
-            wasmModule.applyNightVision(wasmBuffer, canvas.width, canvas.height, filterSettings.nightvision.seed);
-        } else if (currentFilter === 'toon') {
-            wasmModule.applyToon(wasmBuffer, canvas.width, canvas.height, filterSettings.toon.levels);
+        } else if (currentFilter === 'xray') {
+            wasmModule.applyXrayFilter(wasmBuffer, data.length);
         } else if (currentFilter === 'mirror') {
             wasmModule.applyMirror(wasmBuffer, canvas.width, canvas.height, filterSettings.mirror.mode);
-        } else if (currentFilter === 'oldtv') {
-            filterSettings.oldtv.seed = Date.now() % 10000;
-            wasmModule.applyOldTV(wasmBuffer, canvas.width, canvas.height, filterSettings.oldtv.seed);
-        } else if (currentFilter === 'vhs') {
-            filterSettings.vhs.seed = Date.now() % 10000;
-            wasmModule.applyVHS(wasmBuffer, canvas.width, canvas.height, filterSettings.vhs.seed);
+        } else if (currentFilter === 'pixelate') {
+            wasmModule.applyPixelate(wasmBuffer, canvas.width, canvas.height, filterSettings.pixelate.blockSize);
         } else if (currentFilter === 'chroma' && chromaLoaded && chromaBgBuffer) {
             wasmModule.applyChromaKey(
                 wasmBuffer,
@@ -201,8 +170,8 @@ function processFrame() {
                 chromaColor.b,
                 chromaTolerance
             );
-        } else if (currentFilter === 'xray') {
-            wasmModule.applyXrayFilter(wasmBuffer, data.length);
+        } else if (currentFilter === 'thermal') {
+            wasmModule.applyThermal(wasmBuffer, data.length);
         }
 
         // 3. WASM 메모리에서 JS로 결과 복사 (한 번만)
@@ -263,19 +232,12 @@ function setFilter(filter) {
     // 선택된 버튼에 active 클래스 추가 및 aria-pressed 업데이트
     const filterBtnMap = {
         'none': btnNone,
-        'grayscale': btnGrayscale,
-        'flip': btnFlip,
         'sepia': btnSepia,
-        'pixelate': btnPixelate,
-        'glitch': btnGlitch,
-        'thermal': btnThermal,
-        'nightvision': btnNightVision,
-        'toon': btnToon,
+        'xray': btnXray,
         'mirror': btnMirror,
-        'oldtv': btnOldTV,
-        'vhs': btnVHS,
+        'pixelate': btnPixelate,
         'chroma': btnChroma,
-        'xray': btnXray
+        'thermal': btnThermal
     };
 
     const activeBtn = filterBtnMap[filter];
@@ -354,19 +316,12 @@ function setupChromaEvents() {
  */
 function setupEventListeners() {
     btnNone.addEventListener('click', () => setFilter('none'));
-    btnGrayscale.addEventListener('click', () => setFilter('grayscale'));
-    btnFlip.addEventListener('click', () => setFilter('flip'));
     btnSepia.addEventListener('click', () => setFilter('sepia'));
-    btnPixelate.addEventListener('click', () => setFilter('pixelate'));
-    btnGlitch.addEventListener('click', () => setFilter('glitch'));
-    btnThermal.addEventListener('click', () => setFilter('thermal'));
-    btnNightVision.addEventListener('click', () => setFilter('nightvision'));
-    btnToon.addEventListener('click', () => setFilter('toon'));
-    btnMirror.addEventListener('click', () => setFilter('mirror'));
-    btnOldTV.addEventListener('click', () => setFilter('oldtv'));
-    btnVHS.addEventListener('click', () => setFilter('vhs'));
-    btnChroma.addEventListener('click', () => setFilter('chroma'));
     btnXray.addEventListener('click', () => setFilter('xray'));
+    btnMirror.addEventListener('click', () => setFilter('mirror'));
+    btnPixelate.addEventListener('click', () => setFilter('pixelate'));
+    btnChroma.addEventListener('click', () => setFilter('chroma'));
+    btnThermal.addEventListener('click', () => setFilter('thermal'));
 
     setupChromaEvents();
 }
