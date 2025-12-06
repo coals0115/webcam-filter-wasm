@@ -216,58 +216,94 @@ chmod +x build.sh
 ```javascript
 async function initWebcam() {
     const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 }
+        video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+        },
+        audio: false
     });
     video.srcObject = stream;
+
+    // 비디오 메타데이터 로딩 완료 대기
+    await new Promise((resolve) => {
+        video.onloadedmetadata = resolve;
+    });
+
+    // 캔버스 크기 설정
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // WASM 버퍼 미리 할당 (영상 크기에 맞게)
+    const bufferSize = canvas.width * canvas.height * 4;
+    wasmBuffer = wasmModule.allocateBuffer(bufferSize);
 }
 ```
 
-#### (2) 프레임 처리 루프
+#### (2) 프레임 처리 루프 (고성능 버전)
 ```javascript
 function processFrame() {
     // 1. 웹캠에서 프레임 가져오기
-    ctx.drawImage(video, 0, 0, width, height);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // 2. ImageData 추출
-    const imageData = ctx.getImageData(0, 0, width, height);
+    // 2. 필터 적용 (none이 아닐 때만)
+    if (currentFilter !== 'none' && wasmModule && wasmBuffer) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
 
-    // 3. WASM으로 필터 적용
-    if (currentFilter === 'grayscale') {
-        applyGrayscaleFilter(imageData);
-    } else if (currentFilter === 'mirror') {
-        applyMirrorFilter(imageData);
+        // 3. JS 데이터를 WASM 메모리로 복사 (미리 할당된 버퍼 재사용)
+        wasmModule.HEAPU8.set(data, wasmBuffer);
+
+        // 4. WASM에서 필터 처리
+        if (currentFilter === 'sepia') {
+            wasmModule.applySepia(wasmBuffer, data.length);
+        } else if (currentFilter === 'xray') {
+            wasmModule.applyXrayFilter(wasmBuffer, data.length);
+        } else if (currentFilter === 'mirror') {
+            wasmModule.applyMirror(wasmBuffer, canvas.width, canvas.height, mode);
+        } else if (currentFilter === 'pixelate') {
+            wasmModule.applyPixelate(wasmBuffer, canvas.width, canvas.height, blockSize);
+        } else if (currentFilter === 'chroma') {
+            wasmModule.applyChromaKey(wasmBuffer, chromaBgBuffer, ...);
+        } else if (currentFilter === 'thermal') {
+            wasmModule.applyThermal(wasmBuffer, data.length);
+        }
+
+        // 5. WASM 메모리에서 JS로 결과 복사
+        data.set(wasmModule.HEAPU8.subarray(wasmBuffer, wasmBuffer + data.length));
+        ctx.putImageData(imageData, 0, 0);
     }
 
-    // 4. Canvas에 다시 그리기
-    ctx.putImageData(imageData, 0, 0);
-
-    // 5. 다음 프레임 요청
+    // 6. 다음 프레임 요청
     requestAnimationFrame(processFrame);
 }
 ```
 
-#### (3) WASM 함수 호출
+**지원 필터 목록**:
+- `none`: 원본 (필터 없음)
+- `sepia`: 세피아 톤
+- `xray`: X-Ray 효과
+- `mirror`: 좌우/상하/4분할 반전
+- `pixelate`: 픽셀화
+- `chroma`: 크로마키 (배경 합성)
+- `thermal`: 열화상 효과
+
+#### (3) WASM 메모리 관리 (버퍼 재사용 방식)
 ```javascript
-function applyGrayscaleFilter(imageData) {
-    const bytes = imageData.data;
-    const numBytes = bytes.length;
+// 초기화 시 버퍼 할당 (1회)
+const bufferSize = canvas.width * canvas.height * 4;
+wasmBuffer = wasmModule.allocateBuffer(bufferSize);
 
-    // WASM 메모리 할당
-    const ptr = Module._malloc(numBytes);
+// 프레임 처리 시 버퍼 재사용
+wasmModule.HEAPU8.set(data, wasmBuffer);
+wasmModule.applySepia(wasmBuffer, data.length);
+data.set(wasmModule.HEAPU8.subarray(wasmBuffer, wasmBuffer + data.length));
 
-    // 데이터 복사
-    Module.HEAPU8.set(bytes, ptr);
-
-    // C++ 함수 호출
-    Module._applyGrayscaleFilterRaw(ptr, numBytes);
-
-    // 결과 가져오기
-    bytes.set(Module.HEAPU8.subarray(ptr, ptr + numBytes));
-
-    // 메모리 해제
-    Module._free(ptr);
-}
+// 종료 시 버퍼 해제
+wasmModule.freeBuffer(wasmBuffer);
 ```
+
+> **성능 개선**: 매 프레임 `_malloc()`/`_free()` 호출 대신 버퍼를 미리 할당하여 재사용합니다.
 
 ---
 
@@ -348,7 +384,9 @@ button:hover {
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ 1. 웹캠 → Video Element                                 │
-│    navigator.mediaDevices.getUserMedia()                │
+│    navigator.mediaDevices.getUserMedia({                │
+│        video: { width: 640, height: 480, facingMode }   │
+│    })                                                   │
 │    - MediaStream 객체 생성                              │
 │    - video.srcObject에 할당                             │
 └────────────────┬────────────────────────────────────────┘
@@ -356,14 +394,14 @@ button:hover {
                  ↓
 ┌─────────────────────────────────────────────────────────┐
 │ 2. Video → Canvas                                       │
-│    ctx.drawImage(video, 0, 0, width, height)           │
+│    ctx.drawImage(video, 0, 0, canvas.width, height)    │
 │    - 현재 프레임을 Canvas에 그리기                      │
-│    - 60fps로 반복 실행                                  │
+│    - requestAnimationFrame으로 반복 실행               │
 └────────────────┬────────────────────────────────────────┘
                  │
                  ↓
 ┌─────────────────────────────────────────────────────────┐
-│ 3. Canvas → ImageData                                   │
+│ 3. Canvas → ImageData (필터 적용 시에만)                │
 │    const imageData = ctx.getImageData(0, 0, w, h)      │
 │    - 픽셀 데이터 추출                                   │
 │    - Uint8ClampedArray 형식                            │
@@ -372,26 +410,29 @@ button:hover {
                  │
                  ↓
 ┌─────────────────────────────────────────────────────────┐
-│ 4. JavaScript → WASM Memory                             │
-│    const ptr = Module._malloc(numBytes)                │
-│    Module.HEAPU8.set(imageData.data, ptr)              │
-│    - JavaScript 배열 → WASM 힙 메모리로 복사           │
+│ 4. JavaScript → WASM Memory (버퍼 재사용)               │
+│    wasmModule.HEAPU8.set(data, wasmBuffer)             │
+│    - 초기화 시 allocateBuffer()로 미리 할당            │
+│    - 매 프레임 동일 버퍼 재사용 (성능 최적화)           │
 └────────────────┬────────────────────────────────────────┘
                  │
                  ↓
 ┌─────────────────────────────────────────────────────────┐
-│ 5. C++ 필터 처리                                        │
-│    Module._applyGrayscaleFilterRaw(ptr, length)        │
-│    - WASM 메모리 직접 수정                             │
-│    - 각 픽셀에 필터 알고리즘 적용                       │
+│ 5. C++ 필터 처리 (다양한 필터 지원)                     │
+│    wasmModule.applySepia(wasmBuffer, length)           │
+│    wasmModule.applyXrayFilter(wasmBuffer, length)      │
+│    wasmModule.applyMirror(wasmBuffer, w, h, mode)      │
+│    wasmModule.applyPixelate(wasmBuffer, w, h, block)   │
+│    wasmModule.applyChromaKey(wasmBuffer, bg, ...)      │
+│    wasmModule.applyThermal(wasmBuffer, length)         │
 └────────────────┬────────────────────────────────────────┘
                  │
                  ↓
 ┌─────────────────────────────────────────────────────────┐
 │ 6. WASM Memory → JavaScript                             │
-│    imageData.data.set(                                  │
-│        Module.HEAPU8.subarray(ptr, ptr + numBytes)     │
-│    )                                                    │
+│    data.set(wasmModule.HEAPU8.subarray(                │
+│        wasmBuffer, wasmBuffer + data.length            │
+│    ))                                                   │
 │    - 처리된 데이터 JavaScript로 복사                    │
 └────────────────┬────────────────────────────────────────┘
                  │
@@ -406,7 +447,7 @@ button:hover {
 ┌─────────────────────────────────────────────────────────┐
 │ 8. 반복                                                 │
 │    requestAnimationFrame(processFrame)                 │
-│    - 60fps로 반복 실행                                  │
+│    - FPS 및 처리 시간 측정 포함                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -419,24 +460,33 @@ JavaScript 메모리:
 │ [255, 128, 64, 255, ...]       │ ← Uint8ClampedArray
 └─────────────────────────────────┘
          │
-         ↓ (복사)
-WebAssembly 힙:
+         ↓ (복사: HEAPU8.set())
+WebAssembly 힙 (미리 할당된 버퍼):
 ┌─────────────────────────────────┐
-│ Module.HEAPU8[ptr]              │
+│ wasmModule.HEAPU8[wasmBuffer]   │
 │ [255, 128, 64, 255, ...]       │ ← C++에서 직접 수정
 └─────────────────────────────────┘
          │
-         ↓ (수정)
+         ↓ (필터 적용: applySepia 등)
 ┌─────────────────────────────────┐
-│ Module.HEAPU8[ptr]              │
-│ [128, 128, 128, 255, ...]      │ ← 필터 적용 결과
+│ wasmModule.HEAPU8[wasmBuffer]   │
+│ [180, 150, 120, 255, ...]      │ ← 세피아 필터 적용 결과
 └─────────────────────────────────┘
          │
-         ↓ (복사)
+         ↓ (복사: subarray + set)
 JavaScript 메모리:
 ┌─────────────────────────────────┐
 │ ImageData.data                  │
-│ [128, 128, 128, 255, ...]      │ ← 화면에 표시
+│ [180, 150, 120, 255, ...]      │ ← 화면에 표시
+└─────────────────────────────────┘
+
+버퍼 관리 (성능 최적화):
+┌─────────────────────────────────┐
+│ wasmBuffer (초기화 시 1회 할당)  │
+│ - allocateBuffer(bufferSize)    │
+│ - 640 × 480 × 4 = 1,228,800    │
+│ - 매 프레임 재사용              │
+│ - 종료 시 freeBuffer() 해제     │
 └─────────────────────────────────┘
 ```
 
@@ -446,61 +496,55 @@ JavaScript 메모리:
 
 ### JavaScript ↔ WebAssembly 메모리 공유
 
-#### 메모리 할당
+#### 현재 구현 방식 (버퍼 재사용)
+
 ```javascript
-// 1. WASM 힙에 메모리 할당
+// 1. 초기화 시 버퍼 미리 할당 (1회)
+const bufferSize = canvas.width * canvas.height * 4;
+wasmBuffer = wasmModule.allocateBuffer(bufferSize);
+
+// 2. 프레임 처리 시 버퍼 재사용
+wasmModule.HEAPU8.set(data, wasmBuffer);           // JS → WASM
+wasmModule.applySepia(wasmBuffer, data.length);   // 필터 적용
+data.set(wasmModule.HEAPU8.subarray(              // WASM → JS
+    wasmBuffer, wasmBuffer + data.length
+));
+
+// 3. 종료 시 버퍼 해제 (1회)
+wasmModule.freeBuffer(wasmBuffer);
+```
+
+#### 기본 메모리 관리 API (참고)
+
+```javascript
+// WASM 힙에 메모리 할당 (저수준 API)
 const ptr = Module._malloc(numBytes);
 // → C의 malloc()과 동일
 // → 반환값: 메모리 주소 (포인터)
-```
 
-#### 데이터 복사 (JS → WASM)
-```javascript
-// 2. JavaScript 배열 → WASM 메모리로 복사
-Module.HEAPU8.set(imageData.data, ptr);
-// → HEAPU8: WASM 힙의 Uint8Array 뷰
-// → set(): 배열 복사 메서드
-```
-
-#### 데이터 읽기 (WASM → JS)
-```javascript
-// 3. WASM 메모리 → JavaScript 배열로 복사
-imageData.data.set(
-    Module.HEAPU8.subarray(ptr, ptr + numBytes)
-);
-// → subarray(): 메모리 영역 참조
-```
-
-#### 메모리 해제
-```javascript
-// 4. WASM 메모리 해제 (필수!)
+// WASM 메모리 해제
 Module._free(ptr);
 // → C의 free()와 동일
 // → 메모리 누수 방지
 ```
 
-### 메모리 누수 방지 패턴
+### 메모리 누수 방지 패턴 (현재 구현)
 
 ```javascript
-function safeApplyFilter(imageData) {
-    let ptr = 0;  // 초기화
+// 페이지 언로드 시 정리
+window.addEventListener('beforeunload', () => {
+    // 애니메이션 중지
+    if (animationId) cancelAnimationFrame(animationId);
 
-    try {
-        const numBytes = imageData.data.length;
-        ptr = Module._malloc(numBytes);  // 할당
+    // WASM 버퍼 해제
+    if (wasmModule && wasmBuffer) wasmModule.freeBuffer(wasmBuffer);
+    if (wasmModule && chromaBgBuffer) wasmModule.freeBuffer(chromaBgBuffer);
 
-        // 데이터 처리
-        Module.HEAPU8.set(imageData.data, ptr);
-        Module._applyGrayscaleFilterRaw(ptr, numBytes);
-        imageData.data.set(Module.HEAPU8.subarray(ptr, ptr + numBytes));
-
-    } finally {
-        // 반드시 해제 (예외 발생 시에도)
-        if (ptr !== 0) {
-            Module._free(ptr);
-        }
+    // 웹캠 스트림 정리
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
     }
-}
+});
 ```
 
 ---
@@ -572,31 +616,36 @@ em++ main.cpp -o filter.js \
 1. 페이지 로드
    ├─ index.html 파싱
    ├─ styles.css 로드 (UI 스타일)
-   ├─ wrapper.js 실행 (Module 객체 설정)
-   ├─ filter.js 로드 (WASM 래퍼)
-   └─ filter.wasm 다운로드 (바이너리)
+   ├─ filters.js 로드 (WASM 래퍼, MODULARIZE 모드)
+   └─ app.js 로드 (메인 로직)
 
-2. WASM 초기화
-   ├─ filter.wasm 컴파일
-   ├─ Module 객체 초기화
-   ├─ 메모리 할당
-   └─ onRuntimeInitialized 콜백 실행
+2. 앱 초기화 (init 함수)
+   ├─ UI 애니메이션 시작 (페이드 인)
+   ├─ 이벤트 리스너 등록 (필터 버튼, 크로마키 설정)
+   └─ loadWasmModule() 호출
 
-3. 애플리케이션 시작
-   ├─ app.js 실행
-   ├─ 웹캠 권한 요청
-   ├─ MediaStream 획득
-   └─ 프레임 처리 루프 시작
+3. WASM 초기화 (loadWasmModule)
+   ├─ Module() 함수 호출 (MODULARIZE 모드)
+   ├─ filters.wasm 컴파일 및 초기화
+   └─ wasmModule 인스턴스 저장
 
-4. 실시간 처리
-   └─ (60fps 반복)
-       ├─ 웹캠 → Canvas
-       ├─ Canvas → ImageData
-       ├─ JS → WASM 메모리 복사
-       ├─ C++ 필터 적용
-       ├─ WASM → JS 메모리 복사
-       ├─ ImageData → Canvas
-       └─ 화면에 표시
+4. 웹캠 초기화 (initWebcam)
+   ├─ getUserMedia() 호출 (640×480, user 카메라)
+   ├─ video.srcObject에 스트림 할당
+   ├─ 메타데이터 로딩 대기
+   ├─ 캔버스 크기 설정
+   ├─ WASM 버퍼 미리 할당 (allocateBuffer)
+   └─ processFrame() 호출 → 루프 시작
+
+5. 실시간 처리 (processFrame 루프)
+   └─ requestAnimationFrame 반복
+       ├─ 웹캠 → Canvas (drawImage)
+       ├─ 필터 적용 (none이 아닐 경우)
+       │   ├─ getImageData → WASM 복사
+       │   ├─ 필터 함수 호출 (sepia, xray, mirror 등)
+       │   └─ WASM → putImageData
+       ├─ 처리 시간 측정 및 표시
+       └─ FPS 계산 및 표시
 ```
 
 ### 프레임 처리 타임라인 (16.67ms @ 60fps)
@@ -612,31 +661,32 @@ em++ main.cpp -o filter.js \
 └─────────────────┬───────────────────────────┘
                   │
 ┌─────────────────┴───────────────────────────┐
-│ 2ms: ctx.getImageData()                     │
+│ 2ms: ctx.getImageData() (필터 시에만)       │
 │      - 픽셀 데이터 추출 (0.8ms)             │
 └─────────────────┬───────────────────────────┘
                   │
 ┌─────────────────┴───────────────────────────┐
-│ 3ms: 메모리 할당 및 복사                    │
-│      - _malloc() (0.1ms)                    │
+│ 3ms: WASM 메모리 복사                       │
 │      - HEAPU8.set() (0.5ms)                 │
+│      - 버퍼 재사용 (malloc 불필요)          │
 └─────────────────┬───────────────────────────┘
                   │
 ┌─────────────────┴───────────────────────────┐
 │ 4ms: C++ 필터 실행 (WASM)                   │
-│      - applyGrayscaleFilterRaw() (2~3ms)    │
-│      ⚡ 가장 많은 시간 소요                 │
+│      - applySepia/applyXray/... (2~5ms)    │
+│      ⚡ 필터에 따라 소요 시간 변동          │
 └─────────────────┬───────────────────────────┘
                   │
 ┌─────────────────┴───────────────────────────┐
-│ 7ms: 결과 복사 및 메모리 해제               │
+│ 7ms: 결과 복사                              │
 │      - subarray() + set() (0.5ms)           │
-│      - _free() (0.1ms)                      │
+│      - 버퍼 재사용 (free 불필요)            │
 └─────────────────┬───────────────────────────┘
                   │
 ┌─────────────────┴───────────────────────────┐
-│ 8ms: ctx.putImageData()                     │
+│ 8ms: ctx.putImageData() + 성능 측정         │
 │      - 처리된 이미지 → Canvas (0.8ms)       │
+│      - processingTime, FPS 업데이트         │
 └─────────────────┬───────────────────────────┘
                   │
 ┌─────────────────┴───────────────────────────┐
@@ -646,6 +696,12 @@ em++ main.cpp -o filter.js \
 
 총 소요 시간: ~9ms (16.67ms 예산의 54%)
 여유 시간: ~7ms → 추가 필터나 효과 가능
+
+성능 지표 (UI 색상 표시):
+- 🟢 < 10ms (Excellent)
+- 🟡 < 20ms (Good)
+- 🟠 < 33ms (Warning)
+- 🔴 ≥ 33ms (Critical)
 ```
 
 ---
@@ -703,11 +759,11 @@ Module.HEAPU8.set(imageData.data, ptr);
 
 ### 3. Canvas 작업 최적화
 
-✅ **권장 사항**:
+✅ **현재 구현**:
 ```javascript
-// Canvas 크기를 고정하고 재사용
-canvas.width = 1280;
-canvas.height = 720;
+// Canvas 크기를 비디오 실제 크기에 맞춤
+canvas.width = video.videoWidth;   // 640
+canvas.height = video.videoHeight; // 480
 
 // willReadFrequently 옵션 사용 (getImageData 최적화)
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -800,10 +856,9 @@ function processFrame() {
 
 | 파일 | 역할 | 언어 |
 |------|------|------|
-| main.cpp | 필터 알고리즘 | C++ |
-| app.js | 웹캠 제어, 필터 호출 | JavaScript |
-| wrapper.js | WASM 로딩 | JavaScript |
-| filter.wasm | 컴파일된 바이너리 | WebAssembly |
-| filter.js | JS ↔ WASM 브릿지 | JavaScript |
-| index.html | UI | HTML |
-| styles.css | 디자인 | CSS |
+| src/filters/filters.cpp | 필터 알고리즘 (sepia, xray, mirror 등) | C++ |
+| web/app.js | 웹캠 제어, 필터 호출, WASM 로딩 | JavaScript |
+| build/filters.wasm | 컴파일된 바이너리 | WebAssembly |
+| build/filters.js | JS ↔ WASM 브릿지 (Emscripten 생성) | JavaScript |
+| web/index.html | UI | HTML |
+| web/styles.css | 디자인 | CSS |
