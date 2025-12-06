@@ -23,6 +23,7 @@ const btnMirror = document.getElementById('btnMirror');
 const btnOldTV = document.getElementById('btnOldTV');
 const btnVHS = document.getElementById('btnVHS');
 const btnChroma = document.getElementById('btnChroma');
+const btnXray = document.getElementById('btnXray');
 
 // 크로마키 UI 요소
 const chromaControls = document.querySelector('.chroma-controls');
@@ -200,6 +201,8 @@ function processFrame() {
                 chromaColor.b,
                 chromaTolerance
             );
+        } else if (currentFilter === 'xray') {
+            wasmModule.applyXrayFilter(wasmBuffer, data.length);
         }
 
         // 3. WASM 메모리에서 JS로 결과 복사 (한 번만)
@@ -271,7 +274,8 @@ function setFilter(filter) {
         'mirror': btnMirror,
         'oldtv': btnOldTV,
         'vhs': btnVHS,
-        'chroma': btnChroma
+        'chroma': btnChroma,
+        'xray': btnXray
     };
 
     const activeBtn = filterBtnMap[filter];
@@ -362,6 +366,7 @@ function setupEventListeners() {
     btnOldTV.addEventListener('click', () => setFilter('oldtv'));
     btnVHS.addEventListener('click', () => setFilter('vhs'));
     btnChroma.addEventListener('click', () => setFilter('chroma'));
+    btnXray.addEventListener('click', () => setFilter('xray'));
 
     setupChromaEvents();
 }
