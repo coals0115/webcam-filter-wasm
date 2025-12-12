@@ -365,6 +365,239 @@ if (document.readyState === 'loading') {
     init();
 }
 
+// ===== JS 필터 (벤치마크용) =====
+
+// 0. Grayscale - C++과 동일: ITU-R BT.601 표준
+function applyGrayscaleJS(data) {
+    for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        // gray = 0.299*R + 0.587*G + 0.114*B (float 버전)
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        data[i] = data[i + 1] = data[i + 2] = gray;
+    }
+}
+
+// 1. Sepia
+function applySepiaJS(data) {
+    for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        data[i] = Math.min(255, 0.393 * r + 0.769 * g + 0.189 * b);
+        data[i + 1] = Math.min(255, 0.349 * r + 0.686 * g + 0.168 * b);
+        data[i + 2] = Math.min(255, 0.272 * r + 0.534 * g + 0.131 * b);
+    }
+}
+
+// 2. X-Ray (C++과 동일한 알고리즘: RGB 각각 반전 + 대비 증강)
+function applyXrayJS(data) {
+    const contrast_factor = 80;
+    for (let i = 0; i < data.length; i += 4) {
+        // 1. 명암 반전
+        const r = 255 - data[i];
+        const g = 255 - data[i + 1];
+        const b = 255 - data[i + 2];
+        // 2. 대비 증강 (C++과 동일: 128 + ((val - 128) * 80) / 128)
+        let newR = 128 + ((r - 128) * contrast_factor / 128) | 0;
+        let newG = 128 + ((g - 128) * contrast_factor / 128) | 0;
+        let newB = 128 + ((b - 128) * contrast_factor / 128) | 0;
+        // 3. 클램핑
+        data[i] = Math.max(0, Math.min(255, newR));
+        data[i + 1] = Math.max(0, Math.min(255, newG));
+        data[i + 2] = Math.max(0, Math.min(255, newB));
+    }
+}
+
+// 3. Mirror (4분할) - C++과 동일: 1루프에서 3영역 동시 복사
+function applyMirrorJS(data, width, height) {
+    const halfW = Math.floor(width / 2);
+    const halfH = Math.floor(height / 2);
+
+    for (let y = 0; y < halfH; y++) {
+        for (let x = 0; x < halfW; x++) {
+            const srcIdx = (y * width + x) * 4;
+            // 우상단 (좌우 반전)
+            const idx1 = (y * width + (width - 1 - x)) * 4;
+            // 좌하단 (상하 반전)
+            const idx2 = ((height - 1 - y) * width + x) * 4;
+            // 우하단 (좌우+상하 반전)
+            const idx3 = ((height - 1 - y) * width + (width - 1 - x)) * 4;
+
+            for (let c = 0; c < 4; c++) {
+                data[idx1 + c] = data[srcIdx + c];
+                data[idx2 + c] = data[srcIdx + c];
+                data[idx3 + c] = data[srcIdx + c];
+            }
+        }
+    }
+}
+
+// 4. Pixelate
+function applyPixelateJS(data, width, height, blockSize) {
+    for (let y = 0; y < height; y += blockSize) {
+        for (let x = 0; x < width; x += blockSize) {
+            let sumR = 0, sumG = 0, sumB = 0, count = 0;
+            const blockH = Math.min(blockSize, height - y);
+            const blockW = Math.min(blockSize, width - x);
+            // 블록 평균
+            for (let by = 0; by < blockH; by++) {
+                for (let bx = 0; bx < blockW; bx++) {
+                    const idx = ((y + by) * width + (x + bx)) * 4;
+                    sumR += data[idx];
+                    sumG += data[idx + 1];
+                    sumB += data[idx + 2];
+                    count++;
+                }
+            }
+            const avgR = (sumR / count) & 0xF8;
+            const avgG = (sumG / count) & 0xF8;
+            const avgB = (sumB / count) & 0xF8;
+            // 블록 채우기
+            for (let by = 0; by < blockH; by++) {
+                for (let bx = 0; bx < blockW; bx++) {
+                    const idx = ((y + by) * width + (x + bx)) * 4;
+                    data[idx] = avgR;
+                    data[idx + 1] = avgG;
+                    data[idx + 2] = avgB;
+                }
+            }
+        }
+    }
+}
+
+// 5. Thermal - C++과 동일: 정수 연산 (밝기 계산 + 색상 매핑)
+function applyThermalJS(data) {
+    for (let i = 0; i < data.length; i += 4) {
+        // 밝기 계산 - C++과 동일: (r*54 + g*183 + b*19) >> 8
+        const brightness = (data[i] * 54 + data[i + 1] * 183 + data[i + 2] * 19) >> 8;
+        let r, g, b;
+
+        // 색상 매핑 - C++과 동일: (t * 255) / range
+        if (brightness < 43) {
+            r = 0;
+            g = 0;
+            b = ((brightness * 255) / 43) | 0;
+        } else if (brightness < 85) {
+            const t = brightness - 43;
+            r = 0;
+            g = ((t * 255) / 42) | 0;
+            b = 255;
+        } else if (brightness < 128) {
+            const t = brightness - 85;
+            r = 0;
+            g = 255;
+            b = (255 - ((t * 255) / 43)) | 0;
+        } else if (brightness < 170) {
+            const t = brightness - 128;
+            r = ((t * 255) / 42) | 0;
+            g = 255;
+            b = 0;
+        } else if (brightness < 213) {
+            const t = brightness - 170;
+            r = 255;
+            g = (255 - ((t * 255) / 43)) | 0;
+            b = 0;
+        } else {
+            const t = brightness - 213;
+            const val = ((t * 255) / 42) | 0;
+            r = 255;
+            g = val;
+            b = val;
+        }
+        data[i] = r;
+        data[i + 1] = g;
+        data[i + 2] = b;
+    }
+}
+
+// 6. Chroma Key
+function applyChromaKeyJS(frameData, bgData, keyR, keyG, keyB, tolerance) {
+    const tolSq = tolerance * tolerance;
+    for (let i = 0; i < frameData.length; i += 4) {
+        const dr = frameData[i] - keyR;
+        const dg = frameData[i + 1] - keyG;
+        const db = frameData[i + 2] - keyB;
+        if (dr * dr + dg * dg + db * db <= tolSq) {
+            frameData[i] = bgData[i];
+            frameData[i + 1] = bgData[i + 1];
+            frameData[i + 2] = bgData[i + 2];
+            frameData[i + 3] = bgData[i + 3];
+        }
+    }
+}
+
+// ===== 벤치마크 함수 =====
+async function runBenchmark(iterations = 50) {
+    console.log(`🚀 벤치마크 시작 (${iterations}회 반복, ${canvas.width}x${canvas.height})`);
+
+    const results = [];
+    const bufferSize = canvas.width * canvas.height * 4;
+
+    const filters = [
+        {
+            name: 'Grayscale',
+            wasmFn: () => wasmModule.applyGrayscale(wasmBuffer, bufferSize),
+            jsFn: (d) => applyGrayscaleJS(d)
+        },
+        {
+            name: 'Sepia',
+            wasmFn: () => wasmModule.applySepia(wasmBuffer, bufferSize),
+            jsFn: (d) => applySepiaJS(d)
+        },
+        {
+            name: 'X-Ray',
+            wasmFn: () => wasmModule.applyXrayFilter(wasmBuffer, bufferSize),
+            jsFn: (d) => applyXrayJS(d)
+        },
+        {
+            name: 'Mirror',
+            wasmFn: () => wasmModule.applyMirror(wasmBuffer, canvas.width, canvas.height, 2),
+            jsFn: (d) => applyMirrorJS(d, canvas.width, canvas.height)
+        },
+        {
+            name: 'Thermal',
+            wasmFn: () => wasmModule.applyThermal(wasmBuffer, bufferSize),
+            jsFn: (d) => applyThermalJS(d)
+        }
+    ];
+
+    for (const filter of filters) {
+        // WASM 측정
+        const wasmTimes = [];
+        for (let i = 0; i < iterations; i++) {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            wasmModule.HEAPU8.set(imageData.data, wasmBuffer);
+            const start = performance.now();
+            filter.wasmFn();
+            wasmTimes.push(performance.now() - start);
+        }
+
+        // JS 측정
+        const jsTimes = [];
+        for (let i = 0; i < iterations; i++) {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const start = performance.now();
+            filter.jsFn(imageData.data);
+            jsTimes.push(performance.now() - start);
+        }
+
+        const wasmAvg = wasmTimes.reduce((a, b) => a + b) / iterations;
+        const jsAvg = jsTimes.reduce((a, b) => a + b) / iterations;
+
+        results.push({
+            '필터': filter.name,
+            'C++ (ms)': wasmAvg.toFixed(2),
+            'JS (ms)': jsAvg.toFixed(2),
+            '성능 향상': (jsAvg / wasmAvg).toFixed(1) + 'x'
+        });
+    }
+
+    console.table(results);
+    console.log('✅ 벤치마크 완료');
+    return results;
+}
+
+// 전역에 노출 (콘솔에서 실행 가능)
+window.runBenchmark = runBenchmark;
+
 // 페이지 언로드 시 정리
 window.addEventListener('beforeunload', () => {
     if (animationId) cancelAnimationFrame(animationId);
