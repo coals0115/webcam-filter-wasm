@@ -64,58 +64,6 @@ void applySepia(uintptr_t dataPtr, int length) {
 }
 
 /**
- * 픽셀아트(Pixelate) 필터 구현
- * 레트로 게임 스타일로 변환 (해상도 낮추기 + 팔레트 제한)
- *
- * @param dataPtr 픽셀 데이터 포인터 (RGBA 형식)
- * @param width 이미지 너비
- * @param height 이미지 높이
- * @param blockSize 픽셀 블록 크기 (클수록 더 픽셀화)
- */
-void applyPixelate(uintptr_t dataPtr, int width, int height, int blockSize) {
-    uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
-
-    // 최소 블록 크기 보장
-    if (blockSize < 2) blockSize = 2;
-
-    for (int y = 0; y < height; y += blockSize) {
-        for (int x = 0; x < width; x += blockSize) {
-            // 블록 내 평균 색상 계산
-            int sumR = 0, sumG = 0, sumB = 0;
-            int count = 0;
-
-            int blockH = (y + blockSize > height) ? height - y : blockSize;
-            int blockW = (x + blockSize > width) ? width - x : blockSize;
-
-            for (int by = 0; by < blockH; by++) {
-                for (int bx = 0; bx < blockW; bx++) {
-                    int idx = ((y + by) * width + (x + bx)) * 4;
-                    sumR += data[idx];
-                    sumG += data[idx + 1];
-                    sumB += data[idx + 2];
-                    count++;
-                }
-            }
-
-            // 평균 색상 (팔레트 제한: 32단계로 양자화)
-            uint8_t avgR = static_cast<uint8_t>((sumR / count) & 0xF8);
-            uint8_t avgG = static_cast<uint8_t>((sumG / count) & 0xF8);
-            uint8_t avgB = static_cast<uint8_t>((sumB / count) & 0xF8);
-
-            // 블록 전체에 평균 색상 적용
-            for (int by = 0; by < blockH; by++) {
-                for (int bx = 0; bx < blockW; bx++) {
-                    int idx = ((y + by) * width + (x + bx)) * 4;
-                    data[idx] = avgR;
-                    data[idx + 1] = avgG;
-                    data[idx + 2] = avgB;
-                }
-            }
-        }
-    }
-}
-
-/**
  * 열화상 카메라(Thermal) 필터 구현 - 정수 연산 최적화 버전
  * 밝기 기반 온도 색상 매핑 (파랑→시안→녹색→노랑→빨강→흰색)
  *
@@ -340,7 +288,6 @@ void freeBuffer(uintptr_t ptr) {
 EMSCRIPTEN_BINDINGS(filters) {
     function("applyGrayscale", &applyGrayscale);
     function("applySepia", &applySepia);
-    function("applyPixelate", &applyPixelate);
     function("applyThermal", &applyThermal);
     function("applyMirror", &applyMirror);
     function("applyChromaKey", &applyChromaKey);

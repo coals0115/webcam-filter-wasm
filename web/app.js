@@ -14,7 +14,7 @@ const btnNone = document.getElementById('btnNone');
 const btnSepia = document.getElementById('btnSepia');
 const btnXray = document.getElementById('btnXray');
 const btnMirror = document.getElementById('btnMirror');
-const btnPixelate = document.getElementById('btnPixelate');
+const btnGrayscale = document.getElementById('btnGrayscale');
 const btnChroma = document.getElementById('btnChroma');
 const btnThermal = document.getElementById('btnThermal');
 
@@ -47,7 +47,6 @@ let wasmBufferSize = 0;
 
 // 필터별 설정
 const filterSettings = {
-    pixelate: { blockSize: 8 },
     mirror: { mode: 2 }  // 0=좌우, 1=상하, 2=4분할
 };
 
@@ -154,8 +153,8 @@ function processFrame() {
             wasmModule.applyXrayFilter(wasmBuffer, data.length);
         } else if (currentFilter === 'mirror') {
             wasmModule.applyMirror(wasmBuffer, canvas.width, canvas.height, filterSettings.mirror.mode);
-        } else if (currentFilter === 'pixelate') {
-            wasmModule.applyPixelate(wasmBuffer, canvas.width, canvas.height, filterSettings.pixelate.blockSize);
+        } else if (currentFilter === 'grayscale') {
+            wasmModule.applyGrayscale(wasmBuffer, data.length);
         } else if (currentFilter === 'chroma' && chromaLoaded && chromaBgBuffer) {
             wasmModule.applyChromaKey(
                 wasmBuffer,
@@ -232,7 +231,7 @@ function setFilter(filter) {
         'sepia': btnSepia,
         'xray': btnXray,
         'mirror': btnMirror,
-        'pixelate': btnPixelate,
+        'grayscale': btnGrayscale,
         'chroma': btnChroma,
         'thermal': btnThermal
     };
@@ -316,7 +315,7 @@ function setupEventListeners() {
     btnSepia.addEventListener('click', () => setFilter('sepia'));
     btnXray.addEventListener('click', () => setFilter('xray'));
     btnMirror.addEventListener('click', () => setFilter('mirror'));
-    btnPixelate.addEventListener('click', () => setFilter('pixelate'));
+    btnGrayscale.addEventListener('click', () => setFilter('grayscale'));
     btnChroma.addEventListener('click', () => setFilter('chroma'));
     btnThermal.addEventListener('click', () => setFilter('thermal'));
 
@@ -430,40 +429,7 @@ function applyMirrorJS(data, width, height) {
     }
 }
 
-// 4. Pixelate
-function applyPixelateJS(data, width, height, blockSize) {
-    for (let y = 0; y < height; y += blockSize) {
-        for (let x = 0; x < width; x += blockSize) {
-            let sumR = 0, sumG = 0, sumB = 0, count = 0;
-            const blockH = Math.min(blockSize, height - y);
-            const blockW = Math.min(blockSize, width - x);
-            // 블록 평균
-            for (let by = 0; by < blockH; by++) {
-                for (let bx = 0; bx < blockW; bx++) {
-                    const idx = ((y + by) * width + (x + bx)) * 4;
-                    sumR += data[idx];
-                    sumG += data[idx + 1];
-                    sumB += data[idx + 2];
-                    count++;
-                }
-            }
-            const avgR = (sumR / count) & 0xF8;
-            const avgG = (sumG / count) & 0xF8;
-            const avgB = (sumB / count) & 0xF8;
-            // 블록 채우기
-            for (let by = 0; by < blockH; by++) {
-                for (let bx = 0; bx < blockW; bx++) {
-                    const idx = ((y + by) * width + (x + bx)) * 4;
-                    data[idx] = avgR;
-                    data[idx + 1] = avgG;
-                    data[idx + 2] = avgB;
-                }
-            }
-        }
-    }
-}
-
-// 5. Thermal - C++과 동일: 정수 연산 (밝기 계산 + 색상 매핑)
+// 4. Thermal - C++과 동일: 정수 연산 (밝기 계산 + 색상 매핑)
 function applyThermalJS(data) {
     for (let i = 0; i < data.length; i += 4) {
         // 밝기 계산 - C++과 동일: (r*54 + g*183 + b*19) >> 8
