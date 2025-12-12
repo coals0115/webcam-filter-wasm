@@ -6,6 +6,33 @@
 using namespace emscripten;
 
 /**
+ * 흑백(Grayscale) 필터 구현 - 고성능 버전
+ * ITU-R BT.601 표준 기반 밝기 변환
+ *
+ * @param dataPtr 픽셀 데이터 포인터 (RGBA 형식)
+ * @param length 데이터 길이 (바이트)
+ */
+void applyGrayscale(uintptr_t dataPtr, int length) {
+    uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
+
+    for (int i = 0; i < length; i += 4) {
+        uint8_t r = data[i];
+        uint8_t g = data[i + 1];
+        uint8_t b = data[i + 2];
+
+        // ITU-R BT.601 표준 (정수 연산 최적화)
+        // gray = 0.299*R + 0.587*G + 0.114*B
+        // gray = (R*77 + G*150 + B*29) >> 8
+        uint8_t gray = static_cast<uint8_t>((r * 77 + g * 150 + b * 29) >> 8);
+
+        data[i] = gray;
+        data[i + 1] = gray;
+        data[i + 2] = gray;
+        // Alpha (data[i + 3])는 그대로 유지
+    }
+}
+
+/**
  * 세피아(Sepia) 필터 구현 - 고성능 버전
  * 빈티지/레트로 사진 효과
  *
@@ -89,7 +116,7 @@ void applyPixelate(uintptr_t dataPtr, int width, int height, int blockSize) {
 }
 
 /**
- * 열화상 카메라(Thermal) 필터 구현
+ * 열화상 카메라(Thermal) 필터 구현 - 정수 연산 최적화 버전
  * 밝기 기반 온도 색상 매핑 (파랑→시안→녹색→노랑→빨강→흰색)
  *
  * @param dataPtr 픽셀 데이터 포인터 (RGBA 형식)
@@ -99,48 +126,49 @@ void applyThermal(uintptr_t dataPtr, int length) {
     uint8_t* data = reinterpret_cast<uint8_t*>(dataPtr);
 
     for (int i = 0; i < length; i += 4) {
-        // 밝기 계산 (0-255)
+        // 밝기 계산 (0-255) - 정수 연산
         int brightness = (data[i] * 54 + data[i + 1] * 183 + data[i + 2] * 19) >> 8;
 
         uint8_t r, g, b;
 
-        // 온도 색상 매핑 (6단계 그라데이션)
+        // 온도 색상 매핑 (6단계 그라데이션) - 정수 연산 최적화
+        // float 나눗셈 제거: (val * 255) / range 형태로 변환
         if (brightness < 43) {
-            // 검정 → 파랑
-            float t = brightness / 43.0f;
+            // 검정 → 파랑: t = brightness / 43, b = t * 255 = (brightness * 255) / 43
             r = 0;
             g = 0;
-            b = static_cast<uint8_t>(t * 255);
+            b = static_cast<uint8_t>((brightness * 255) / 43);
         } else if (brightness < 85) {
-            // 파랑 → 시안
-            float t = (brightness - 43) / 42.0f;
+            // 파랑 → 시안: t = (brightness - 43) / 42
+            int t = brightness - 43;
             r = 0;
-            g = static_cast<uint8_t>(t * 255);
+            g = static_cast<uint8_t>((t * 255) / 42);
             b = 255;
         } else if (brightness < 128) {
-            // 시안 → 녹색
-            float t = (brightness - 85) / 43.0f;
+            // 시안 → 녹색: t = (brightness - 85) / 43
+            int t = brightness - 85;
             r = 0;
             g = 255;
-            b = static_cast<uint8_t>(255 * (1 - t));
+            b = static_cast<uint8_t>(255 - (t * 255) / 43);
         } else if (brightness < 170) {
-            // 녹색 → 노랑
-            float t = (brightness - 128) / 42.0f;
-            r = static_cast<uint8_t>(t * 255);
+            // 녹색 → 노랑: t = (brightness - 128) / 42
+            int t = brightness - 128;
+            r = static_cast<uint8_t>((t * 255) / 42);
             g = 255;
             b = 0;
         } else if (brightness < 213) {
-            // 노랑 → 빨강
-            float t = (brightness - 170) / 43.0f;
+            // 노랑 → 빨강: t = (brightness - 170) / 43
+            int t = brightness - 170;
             r = 255;
-            g = static_cast<uint8_t>(255 * (1 - t));
+            g = static_cast<uint8_t>(255 - (t * 255) / 43);
             b = 0;
         } else {
-            // 빨강 → 흰색
-            float t = (brightness - 213) / 42.0f;
+            // 빨강 → 흰색: t = (brightness - 213) / 42
+            int t = brightness - 213;
+            int val = (t * 255) / 42;
             r = 255;
-            g = static_cast<uint8_t>(t * 255);
-            b = static_cast<uint8_t>(t * 255);
+            g = static_cast<uint8_t>(val);
+            b = static_cast<uint8_t>(val);
         }
 
         data[i] = r;
@@ -310,6 +338,7 @@ void freeBuffer(uintptr_t ptr) {
 
 // JavaScript에 함수 노출
 EMSCRIPTEN_BINDINGS(filters) {
+    function("applyGrayscale", &applyGrayscale);
     function("applySepia", &applySepia);
     function("applyPixelate", &applyPixelate);
     function("applyThermal", &applyThermal);
