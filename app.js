@@ -38,7 +38,6 @@ const fpsEl = document.getElementById('fps');
 let currentFilter = 'none';
 let wasmModule = null;
 let animationId = null;
-let lastFrameTime = Date.now();
 let frameCount = 0;
 let fpsUpdateTime = Date.now();
 
@@ -93,16 +92,14 @@ async function initWebcam() {
     try {
         statusDiv.innerHTML = '<p>웹캠 접근 중...</p>';
 
-        const stream = await navigator.mediaDevices.getUserMedia({
+        video.srcObject = await navigator.mediaDevices.getUserMedia({
             video: {
-                width: { ideal: 640 },
-                height: { ideal: 480 },
+                width: {ideal: 640},
+                height: {ideal: 480},
                 facingMode: 'user'
             },
             audio: false
         });
-
-        video.srcObject = stream;
 
         // 비디오 메타데이터 로딩 완료 대기
         await new Promise((resolve) => {
