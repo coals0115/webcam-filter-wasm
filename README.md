@@ -55,42 +55,50 @@ cd emsdk && source ./emsdk_env.sh && cd ..
 
 ## 코드 설명
 
-### 손아영 - 세피아, X-Ray 필터
+### 손아영 - 세피아 필터
 
-**세피아 필터**
 - 이미지 메모리 주소를 받아 픽셀 단위로 반복 처리
 - RGB 값을 읽고 정수 연산으로 세피아 공식 적용
 - 클램핑 후 8비트 데이터로 변환하여 원래 위치에 덮어쓰기
 
-**X-Ray 필터**
-- 명암 반전(`255 - 원래값`)과 대비 증강 조합
-- 픽셀 밝기 차이를 극대화하여 X-Ray 투과 효과 구현
-- 0~255 범위로 클램핑 후 메모리에 저장
+### 강성준 - 크로마키 필터
 
-### 강성준 - 크로마키, 열화상 필터
-
-**크로마키 필터**
 - RGB 3차원 공간의 거리 공식으로 기준 색상과의 유사도 판단
 - `sqrt()` 대신 제곱값 비교로 성능 최적화: `distSq <= tolSq`
 - 허용 범위 내 픽셀을 배경 이미지로 대체
 
-**열화상 필터**
-- 밝기를 색상으로 시각화하여 열화상 카메라 효과 구현
-- 녹색 채널에 높은 가중치 + 비트 연산으로 밝기 계산 최적화
-- 6단계 그라데이션 매핑: 어두움(파랑) → 밝음(빨강/흰색)
+### 방채민 - JS↔WASM 연동
 
-### 방채민 - 흑백, 거울 필터, JS↔WASM 연동
+```mermaid
+sequenceDiagram
+    participant Canvas
+    participant JS as JavaScript
+    participant WASM as WASM Heap
+    participant CPP as C++ Filter
 
-**흑백 필터**
-- ITU-R BT.601 표준 사용: `0.299*R + 0.587*G + 0.114*B`
-- 사람의 눈이 녹색에 더 민감하므로 G에 높은 가중치 부여
-- 정수 연산 최적화: `(R*77 + G*150 + B*29) >> 8`
+    Note over Canvas,CPP: 프레임 처리 사이클
 
-**거울 필터**
-- mode 파라미터로 세 가지 모드 지원: 좌우 대칭, 상하 대칭, 4분할 대칭
-- 좌우 대칭: `(y * width + x)` 인덱스를 `(y * width + (width - 1 - x))`로 변환하여 복사
+    Canvas->>JS: getImageData()
+    Note right of JS: Uint8Array 추출
 
-**JS↔WASM 연동**
+    JS->>WASM: allocateBuffer(size)
+    Note right of WASM: 힙 메모리 할당
+
+    JS->>WASM: HEAPU8.set(pixelData, ptr)
+    Note right of WASM: 픽셀 데이터 복사
+
+    WASM->>CPP: applyFilter(ptr, width, height)
+    Note right of CPP: 필터 연산 수행
+
+    CPP-->>WASM: 처리 완료
+
+    WASM->>JS: HEAPU8.subarray(ptr, ptr+size)
+    Note right of JS: 결과 데이터 읽기
+
+    JS->>Canvas: putImageData()
+    Note right of Canvas: 화면에 렌더링
+```
+
 - `getImageData()`로 Canvas에서 픽셀 데이터(Uint8Array) 추출
 - `allocateBuffer()`로 WASM 힙에 버퍼 할당
 - `HEAPU8.set()`으로 JavaScript 배열을 WASM 메모리에 복사
@@ -110,12 +118,9 @@ cd emsdk && source ./emsdk_env.sh && cd ..
   - 결과적으로 웹 브라우저에서도 끊김 없는 성능 확보
 
 ### 손아영
-- **어려움**: 생소한 기술 개념과 구조 설계
-  - 정수/비트 연산 최적화 등 낯선 개념 적용의 어려움
-  - 프로젝트 파일 모듈화(다수 파일 분할) 과정의 난관
-- **해결**: 협업과 학습을 통한 구현
-  - 팀원들의 도움과 관련 자료 학습으로 개념 숙지
-  - 학습 내용을 바탕으로 필터 기능 구현 완료
+- **어려움**: 프로젝트 파일의 모듈화(다수 파일 분할)와 정수 연산 최적화, 비트 연산 등 생소한 개념이 많아 어려움을 겪었음
+
+- **해결**: 팀원들의 도움과 관련 자료 학습을 통해, 필터 기능을 구현함.
 
 ### 방채민
 - **어려움**: Emscripten 환경 설정 및 메모리 연동
